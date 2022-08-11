@@ -1,0 +1,586 @@
+---
+title: "2_Names_and_Values"
+output:
+  pdf_document: default
+  html_document: default
+date: "2022-08-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(1014)
+library(lobstr)
+```
+
+### 1. Given the following data frame, how do I create a new column called “3” that contains the sum of 1 and 2? You may only use $, not [[. What makes 1, 2, and 3 challenging as variable names?
+
+```{r}
+df <- data.frame(runif(3), runif(3))
+names(df) <- c(1, 2)
+```
+
+Answer:
+
+```{r}
+df$`3` <- df$`1` + df$`2`
+df
+```
+
+### 2. In the following code, how much memory does y occupy?
+
+```{r}
+x <- runif(1e6)
+y <- list(x, x, x)
+obj_size(y)
+```
+
+### 3. On which line does a get copied in the following example?
+
+```{r}
+a <- c(1, 5, 3, 2)
+b <- a
+b[[1]] <- 10
+```
+
+Line 3
+
+## 2.2 Binding basics
+
+```{r}
+x <- c(1, 2, 3)
+```
+
+It’s creating an object, a vector of values, c(1, 2, 3).  
+And it’s binding that object to a name, x.
+
+```{r}
+y <- x
+```
+
+you get another binding to the existing object
+
+You can access an object’s identifier with lobstr::obj_addr(). Doing so allows you to see that both x and y point to the same identifier:
+
+```{r}
+obj_addr(x)
+obj_addr(y)
+```
+
+### 2.2.1 Non-syntactic names
+
+Bad names
+```{r, error=TRUE}
+_abc <- 1
+
+if <- 10
+```
+
+Can override if wild using backticks. Can also use single or double quotes but makes it even worse to retrieve values
+```{r, eval=FALSE}
+`_abc` <- 1
+`_abc`
+#> [1] 1
+
+`if` <- 10
+`if`
+#> [1] 10
+```
+
+### 2.2.2 Exercises
+
+#### 1. Explain the relationship between a, b, c and d in the following code:
+
+```{r}
+a <- 1:10
+b <- a
+c <- b
+d <- 1:10
+```
+
+```{r}
+obj_addr(a)
+obj_addr(b)
+obj_addr(c)
+obj_addr(d)
+```
+
+
+a, b, and c are all names which point to the same object. d points to a different object
+
+#### 2. The following code accesses the mean function in multiple ways. Do they all point to the same underlying function object? Verify this with lobstr::obj_addr().
+
+```{r, eval = F}
+mean
+base::mean
+get("mean")
+evalq(mean)
+match.fun("mean")
+```
+
+```{r}
+obj_addr(mean)
+obj_addr(base::mean)
+obj_addr(get("mean"))
+obj_addr(evalq(mean))
+obj_addr(match.fun("mean"))
+```
+
+Yes all access the sample mean function object
+
+#### 3. By default, base R data import functions, like `read.csv()`, will automatically convert non-syntactic names to syntactic ones. Why might this be problematic? What option allows you to suppress this behaviour?
+
+Values in the data could refer to non-syntactic names. It could make exporting back out more difficult. Names no longer match. In `read.csv()` can be suppressed with `check.names = FALSE`
+
+
+#### 4. What rules does `make.names()` use to convert non-syntactic names into syntactic ones?
+
+Can't start with digit or underscore or be a reserved word
+
+#### 5. I slightly simplified the rules that govern syntactic names. Why is .123e1 not a syntactic name? Read ?make.names for the full details.
+
+You can start a name with a dot, but it has to be followed by something other than an digit. These objects are hidden in the environment like they are on the command line when using only `ls`
+
+```{r}
+._haha <- "asada"
+.asdasd <- "haha"
+```
+
+## 2.3 Copy-on-modify
+
+A copy is made when y is modified. x remains but a new object for y is created
+```{r}
+x <- c(1, 2, 3)
+y <- x
+
+obj_addr(x)
+obj_addr(y)
+
+y[[3]] <- 4
+x
+
+obj_addr(x)
+obj_addr(y)
+```
+
+### 2.3.1 tracemem()
+
+Get object's current address
+```{r}
+x <- c(1, 2, 3)
+cat(tracemem(x), "\n")
+```
+
+Keeps tracking
+```{r}
+y <- x
+y[[3]] <- 4L
+```
+
+Modifying an object with only a single name bound to it does not create a new object it just modifies in place
+
+```{r}
+y[[3]] <- 5L
+
+untracemem(x)
+```
+
+
+### 2.3.2 Function calls
+
+The same rules for copying also apply to function calls.
+
+```{r}
+f <- function(a) {
+  a
+}
+
+x <- c(1, 2, 3)
+cat(tracemem(x), "\n")
+
+z <- f(x)
+# there's no copy here!
+
+untracemem(x)
+
+obj_addr(x)
+obj_addr(z)
+
+```
+
+Now if we do modify a it does make a copy. Not sure why `tracemem()` not reporting it
+
+```{r}
+f <- function(a) {
+  a + 1
+}
+
+x <- c(1, 2, 3)
+cat(tracemem(x), "\n")
+
+z <- f(x)
+# there's no copy here!
+
+untracemem(x)
+obj_addr(x)
+obj_addr(z)
+```
+
+### 2.3.3 Lists
+
+Shallow copies are made when one list gets modified. Only the list object and it's bindings are copied but not the values they point to.
+```{r}
+l1 <- list(1, 2, 3)
+l2 <- l1
+l2[[3]] <- 4
+ref(l1, l2)
+```
+
+### 2.3.4 Data frames
+
+Data frames are lists of vectors
+
+```{r}
+d1 <- data.frame(x = c(1, 5, 6), y = c(2, 4, 3))
+```
+
+If you modify a column, only that column needs to be modified; the others will still point to their original references:
+
+```{r}
+d2 <- d1
+d2[, 2] <- d2[, 2] * 2
+```
+
+However, if you modify a row, every column is modified, which means every column must be copied:
+
+```{r}
+d3 <- d1
+d3[1, ] <- d3[1, ] * 3
+```
+
+### 2.3.5 Character vectors
+
+```{r}
+x <- c("a", "a", "abc", "d")
+```
+
+R actually uses a global string pool where each element of a character vector is a pointer to a unique string in the pool
+
+```{r}
+ref(x, character = TRUE)
+```
+
+### 2.3.6 Exercises
+
+1. Why is `tracemem(1:10)` not useful?
+
+```{r}
+tracemem(1:10)
+```
+
+There's no name referencing it to start, but more importantly it's never going to change, 1:10 will always have the same value
+
+2. Explain why `tracemem()` shows two copies when you run this code. Hint: carefully look at the difference between this code and the code shown earlier in the section.
+
+```{r}
+x <- c(1L, 2L, 3L)
+tracemem(x)
+
+x[[3]] <- 4
+untracemem(x)
+```
+
+Copied twice because we change 3 to 4 and we convert the vector from int to numeric. This is due to the difference between "4" and "4L"
+
+3. Sketch out the relationship between the following objects:
+
+```{r}
+a <- 1:10
+b <- list(a, a)
+c <- list(b, a, 1:10)
+```
+
+```{r}
+ref(a,b,c)
+```
+
+a points to a vector, b is a list which points to the same vector a twice, and c is list which points to b, the same a vector, and a new vector which is different from a but contains the same value
+
+4. What happens when you run this code?
+
+```{r}
+x <- list(1:10)
+tracemem(x)
+x[[2]] <- x
+untracemem(x)
+
+ref(x)
+```
+
+Creates a list of 1 where the first element points to 1:10. Then adds a second element which points to a new list which contains the original 1:10 vector from x
+
+## 2.4 Object size
+
+find object sizes
+```{r}
+obj_size(letters)
+#> 1,712 B
+obj_size(ggplot2::diamonds)
+#> 3,456,344 B
+```
+
+sizes of lists are smaller than expected since they are references to values
+```{r}
+x <- runif(1e6)
+obj_size(x, )
+#> 8,000,048 B
+
+y <- list(x, x, x)
+obj_size(y)
+#> 8,000,128 B
+```
+
+While sample above, there is an 80 byte difference whiche is the memory an empty 3 element list takes up
+```{r}
+obj_size(list(NULL, NULL, NULL))
+#> 80 B
+```
+
+Can repeat strings without massive memory comsumption due to global string pool
+```{r}
+banana <- "bananas bananas bananas"
+obj_size(banana)
+#> 136 B
+obj_size(rep(banana, 100))
+#> 928 B
+```
+
+Memory doesn't sum as expected since their values are shared it's comsumption is less. Size is same as y since everything in x is in y
+```{r}
+obj_size(x, y)
+#> 8,000,128 B
+obj_size(y)
+#> 8,000,128 B
+```
+
+ALTREP = alternative representation.
+All same size since R only stores the first and last digit when using `:`
+```{r}
+obj_size(1:3)
+#> 680 B
+obj_size(1:1e3)
+#> 680 B
+obj_size(1:1e6)
+#> 680 B
+obj_size(1:1e9)
+#> 680 B
+```
+
+```{r}
+a <- 1:3
+b <- 1:1e9
+obj_size(a)
+obj_size(b)
+```
+
+### 2.4.1 Exercises
+
+1. In the following example, why are object.size(y) and obj_size(y) so radically different? Consult the documentation of object.size().
+
+```{r}
+y <- rep(list(runif(1e4)), 100)
+
+object.size(y)
+#> 8005648 bytes
+obj_size(y)
+#> 80,896 B
+```
+
+Exactly which parts of the memory allocation should be attributed to which object is not clear-cut. This function `object.size()`merely provides a rough indication: it should be reasonably accurate for atomic vectors, but does not detect if elements of a list are shared
+
+2. Take the following list. Why is its size somewhat misleading?
+
+```{r}
+funs <- list(mean, sd, var)
+obj_size(funs)
+#> 17,608 B
+obj_size(mean, sd, var)
+obj_size(mean)
+obj_size(sd)
+obj_size(var)
+```
+
+Separately they add up to ~ 18,080 Bytes but when summed together it's less, most likely due to shared values
+
+3. Predict the output of the following code:
+
+```{r}
+a <- runif(1e6)
+obj_size(a)
+# size of a
+
+b <- list(a, a)
+obj_size(b)
+# slightly bigger than a due to list
+obj_size(b) > obj_size(a)
+
+obj_size(a, b)
+# same as above
+obj_size(b) == obj_size(a, b)
+
+b[[1]][[1]] <- 10
+obj_size(b)
+# double b because 1st element got copied
+obj_size(a, b)
+# same as above since second element of b the same as a
+
+b[[2]][[1]] <- 10
+obj_size(b)
+# same as before since it's a copy in place
+obj_size(a, b)
+# biggest due to 3 vectors now
+```
+
+## 2.5 Modify-in-place
+
+### 2.5.1 Objects with a single binding
+
+modify in place
+```{r}
+v <- c(1, 2, 3)
+v[[3]] <- 4
+```
+
+When it comes to bindings, R can currently only count 0, 1, or many.
+
+For loops have a reputation for being slow in R. Ofte slowness is caused by every iteration of the loop creating a copy
+```{r}
+x <- data.frame(matrix(runif(5 * 1e4), ncol = 5))
+medians <- vapply(x, median, numeric(1))
+
+for (i in seq_along(medians)) {
+  x[[i]] <- x[[i]] - medians[[i]]
+}
+```
+
+This loop is surprisingly slow because each iteration of the loop copies the data frame. You can see this by using `tracemem()`:
+
+```{r}
+cat(tracemem(x), "\n")
+
+for (i in 1:5) {
+  x[[i]] <- x[[i]] - medians[[i]]
+}
+untracemem(x)
+```
+
+We can reduce the number of copies by using a list instead of a data frame. Modifying a list uses internal C code, so the references are not incremented and only a single copy is made:
+```{r}
+y <- as.list(x)
+cat(tracemem(y), "\n")
+
+for (i in 1:5) {
+  y[[i]] <- y[[i]] - medians[[i]]
+}
+```
+
+### 2.5.2 Environments
+
+```{r}
+e1 <- rlang::env(a = 1, b = 2, c = 3)
+e2 <- e1
+```
+
+modified in place
+```{r}
+e1$c <- 4
+e2$c
+```
+
+Environments can contain themselves
+
+```{r}
+e <- rlang::env()
+e$self <- e
+
+ref(e)
+
+```
+
+### 2.5.3 Exercises
+
+1. Explain why the following code doesn’t create a circular list.
+```{r}
+x <- list()
+tracemem(x)
+x[[1]] <- x
+ref(x)
+untracemem(x)
+```
+
+Creates a list within a list. makes copies. with environments it doesn't because they modify in place
+
+2. Wrap the two methods for subtracting medians into two functions, then use the ‘bench’ package to carefully compare their speeds. How does performance change as the number of columns increase?
+
+```{r}
+library(bench)
+
+slow <- function(cols) {
+  x <- data.frame(matrix(runif(5 * 1e4), ncol = cols))
+  medians <- vapply(x, median, numeric(1))
+  for (i in seq_along(medians)) {
+    x[[i]] <- x[[i]] - medians[[i]]
+  }
+}
+
+fast <- function(cols) {
+  x <- data.frame(matrix(runif(5 * 1e4), ncol = cols))
+  medians <- vapply(x, median, numeric(1))
+  for (i in 1:5) {
+    x[[i]] <- x[[i]] - medians[[i]]
+  }
+}
+
+bench_time(slow(5))
+bench_time(fast(5))
+
+bench_time(slow(50))
+bench_time(fast(50))
+
+bench_time(slow(500))
+bench_time(fast(500))
+
+bench_time(slow(5000))
+bench_time(fast(5000))
+```
+
+3. What happens if you attempt to use tracemem() on an environment?
+
+```{r, error=TRUE}
+e <- rlang::env()
+tracemem(e)
+```
+
+Yells at you
+
+## 2.6 Unbinding and the garbage collector
+
+```{r}
+x <- 1:3
+```
+
+```{r}
+x <- 2:4
+```
+
+```{r}
+rm(x)
+```
+
+```{r}
+gc() 
+```
+
+```{r}
+mem_used()
+```
+
