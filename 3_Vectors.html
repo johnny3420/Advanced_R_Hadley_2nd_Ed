@@ -889,7 +889,130 @@ f3</code></pre>
 <h2>3.5 Lists</h2>
 <div id="creating" class="section level3">
 <h3>3.5.1 Creating</h3>
+<pre class="r"><code>l1 &lt;- list(
+  1:3, 
+  &quot;a&quot;, 
+  c(TRUE, FALSE, TRUE), 
+  c(2.3, 5.9)
+)
+
+typeof(l1)</code></pre>
+<pre><code>## [1] &quot;list&quot;</code></pre>
+<pre class="r"><code>#&gt; [1] &quot;list&quot;
+
+str(l1)</code></pre>
+<pre><code>## List of 4
+##  $ : int [1:3] 1 2 3
+##  $ : chr &quot;a&quot;
+##  $ : logi [1:3] TRUE FALSE TRUE
+##  $ : num [1:2] 2.3 5.9</code></pre>
+<pre class="r"><code>#&gt; List of 4
+#&gt;  $ : int [1:3] 1 2 3
+#&gt;  $ : chr &quot;a&quot;
+#&gt;  $ : logi [1:3] TRUE FALSE TRUE
+#&gt;  $ : num [1:2] 2.3 5.9</code></pre>
+<pre class="r"><code>lobstr::obj_size(mtcars)</code></pre>
+<pre><code>## 7.21 kB</code></pre>
+<pre class="r"><code>#&gt; 7,208 B
+
+l2 &lt;- list(mtcars, mtcars, mtcars, mtcars)
+lobstr::obj_size(l2)</code></pre>
+<pre><code>## 7.29 kB</code></pre>
+<pre class="r"><code>#&gt; 7,288 B</code></pre>
+<pre class="r"><code>l3 &lt;- list(list(list(1)))
+str(l3)</code></pre>
+<pre><code>## List of 1
+##  $ :List of 1
+##   ..$ :List of 1
+##   .. ..$ : num 1</code></pre>
+<pre class="r"><code>#&gt; List of 1
+#&gt;  $ :List of 1
+#&gt;   ..$ :List of 1
+#&gt;   .. ..$ : num 1</code></pre>
+<pre class="r"><code>l4 &lt;- list(list(1, 2), c(3, 4))
+l5 &lt;- c(list(1, 2), c(3, 4))
+str(l4)</code></pre>
+<pre><code>## List of 2
+##  $ :List of 2
+##   ..$ : num 1
+##   ..$ : num 2
+##  $ : num [1:2] 3 4</code></pre>
+<pre class="r"><code>#&gt; List of 2
+#&gt;  $ :List of 2
+#&gt;   ..$ : num 1
+#&gt;   ..$ : num 2
+#&gt;  $ : num [1:2] 3 4
+str(l5)</code></pre>
+<pre><code>## List of 4
+##  $ : num 1
+##  $ : num 2
+##  $ : num 3
+##  $ : num 4</code></pre>
+<pre class="r"><code>#&gt; List of 4
+#&gt;  $ : num 1
+#&gt;  $ : num 2
+#&gt;  $ : num 3
+#&gt;  $ : num 4</code></pre>
 </div>
+<div id="testing-and-coercion-1" class="section level3">
+<h3>3.5.2 Testing and coercion</h3>
+<pre class="r"><code>list(1:3)</code></pre>
+<pre><code>## [[1]]
+## [1] 1 2 3</code></pre>
+<pre class="r"><code>#&gt; [[1]]
+#&gt; [1] 1 2 3
+as.list(1:3)</code></pre>
+<pre><code>## [[1]]
+## [1] 1
+## 
+## [[2]]
+## [1] 2
+## 
+## [[3]]
+## [1] 3</code></pre>
+<pre class="r"><code>#&gt; [[1]]
+#&gt; [1] 1
+#&gt; 
+#&gt; [[2]]
+#&gt; [1] 2
+#&gt; 
+#&gt; [[3]]
+#&gt; [1] 3</code></pre>
+</div>
+<div id="matrices-and-array" class="section level3">
+<h3>3.5.3 Matrices and array</h3>
+<pre class="r"><code>l &lt;- list(1:3, &quot;a&quot;, TRUE, 1.0)
+dim(l) &lt;- c(2, 2)
+l</code></pre>
+<pre><code>##      [,1]      [,2]
+## [1,] integer,3 TRUE
+## [2,] &quot;a&quot;       1</code></pre>
+<pre class="r"><code>#&gt;      [,1]      [,2]
+#&gt; [1,] Integer,3 TRUE
+#&gt; [2,] &quot;a&quot;       1
+
+l[[1, 1]]</code></pre>
+<pre><code>## [1] 1 2 3</code></pre>
+<pre class="r"><code>#&gt; [1] 1 2 3</code></pre>
+</div>
+<div id="exercises-3" class="section level3">
+<h3>3.5.4 Exercises</h3>
+<div id="list-all-the-ways-that-a-list-differs-from-an-atomic-vector." class="section level4">
+<h4>1. List all the ways that a list differs from an atomic vector.</h4>
+</div>
+<div id="why-do-you-need-to-use-unlist-to-convert-a-list-to-an-atomic-vector-why-doesnt-as.vector-work" class="section level4">
+<h4>2. Why do you need to use unlist() to convert a list to an atomic
+vector? Why doesn’t as.vector() work?</h4>
+<p>Lists aren’t vectors and work differently</p>
+</div>
+<div id="compare-and-contrast-c-and-unlist-when-combining-a-date-and-date-time-into-a-single-vector." class="section level4">
+<h4>3. Compare and contrast c() and unlist() when combining a date and
+date-time into a single vector.</h4>
+</div>
+</div>
+</div>
+<div id="data-frames-and-tibbles" class="section level2">
+<h2>3.6 Data frames and tibbles</h2>
 </div>
 </div>
 

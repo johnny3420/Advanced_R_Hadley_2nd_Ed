@@ -1023,4 +1023,202 @@ Levels and order aren't the same as in f1
 ## 3.5 Lists
 ### 3.5.1 Creating
 
+```r
+l1 <- list(
+  1:3, 
+  "a", 
+  c(TRUE, FALSE, TRUE), 
+  c(2.3, 5.9)
+)
 
+typeof(l1)
+```
+
+```
+## [1] "list"
+```
+
+```r
+#> [1] "list"
+
+str(l1)
+```
+
+```
+## List of 4
+##  $ : int [1:3] 1 2 3
+##  $ : chr "a"
+##  $ : logi [1:3] TRUE FALSE TRUE
+##  $ : num [1:2] 2.3 5.9
+```
+
+```r
+#> List of 4
+#>  $ : int [1:3] 1 2 3
+#>  $ : chr "a"
+#>  $ : logi [1:3] TRUE FALSE TRUE
+#>  $ : num [1:2] 2.3 5.9
+```
+
+
+```r
+lobstr::obj_size(mtcars)
+```
+
+```
+## 7.21 kB
+```
+
+```r
+#> 7,208 B
+
+l2 <- list(mtcars, mtcars, mtcars, mtcars)
+lobstr::obj_size(l2)
+```
+
+```
+## 7.29 kB
+```
+
+```r
+#> 7,288 B
+```
+
+
+```r
+l3 <- list(list(list(1)))
+str(l3)
+```
+
+```
+## List of 1
+##  $ :List of 1
+##   ..$ :List of 1
+##   .. ..$ : num 1
+```
+
+```r
+#> List of 1
+#>  $ :List of 1
+#>   ..$ :List of 1
+#>   .. ..$ : num 1
+```
+
+
+```r
+l4 <- list(list(1, 2), c(3, 4))
+l5 <- c(list(1, 2), c(3, 4))
+str(l4)
+```
+
+```
+## List of 2
+##  $ :List of 2
+##   ..$ : num 1
+##   ..$ : num 2
+##  $ : num [1:2] 3 4
+```
+
+```r
+#> List of 2
+#>  $ :List of 2
+#>   ..$ : num 1
+#>   ..$ : num 2
+#>  $ : num [1:2] 3 4
+str(l5)
+```
+
+```
+## List of 4
+##  $ : num 1
+##  $ : num 2
+##  $ : num 3
+##  $ : num 4
+```
+
+```r
+#> List of 4
+#>  $ : num 1
+#>  $ : num 2
+#>  $ : num 3
+#>  $ : num 4
+```
+
+### 3.5.2 Testing and coercion
+
+
+```r
+list(1:3)
+```
+
+```
+## [[1]]
+## [1] 1 2 3
+```
+
+```r
+#> [[1]]
+#> [1] 1 2 3
+as.list(1:3)
+```
+
+```
+## [[1]]
+## [1] 1
+## 
+## [[2]]
+## [1] 2
+## 
+## [[3]]
+## [1] 3
+```
+
+```r
+#> [[1]]
+#> [1] 1
+#> 
+#> [[2]]
+#> [1] 2
+#> 
+#> [[3]]
+#> [1] 3
+```
+
+### 3.5.3 Matrices and array
+
+```r
+l <- list(1:3, "a", TRUE, 1.0)
+dim(l) <- c(2, 2)
+l
+```
+
+```
+##      [,1]      [,2]
+## [1,] integer,3 TRUE
+## [2,] "a"       1
+```
+
+```r
+#>      [,1]      [,2]
+#> [1,] Integer,3 TRUE
+#> [2,] "a"       1
+
+l[[1, 1]]
+```
+
+```
+## [1] 1 2 3
+```
+
+```r
+#> [1] 1 2 3
+```
+### 3.5.4 Exercises
+#### 1. List all the ways that a list differs from an atomic vector.
+
+#### 2. Why do you need to use unlist() to convert a list to an atomic vector? Why doesn’t as.vector() work?
+Lists aren't vectors and work differently
+
+#### 3. Compare and contrast c() and unlist() when combining a date and date-time into a single vector.
+
+## 3.6 Data frames and tibbles
