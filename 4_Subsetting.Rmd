@@ -457,3 +457,260 @@ is.data.frame(mtcars)
 ```
 
 ## 4.5 Applications
+### 4.5.1 Lookup tables (character subsetting)
+
+```{r}
+x <- c("m", "f", "u", "f", "f", "m", "m")
+lookup <- c(m = "Male", f = "Female", u = NA)
+lookup[x]
+#>        m        f        u        f        f        m        m 
+#>   "Male" "Female"       NA "Female" "Female"   "Male"   "Male"
+```
+
+```{r}
+unname(lookup[x])
+#> [1] "Male"   "Female" NA       "Female" "Female" "Male"   "Male"
+```
+
+### 4.5.2 Matching and merging by hand (integer subsetting)
+
+```{r}
+grades <- c(1, 2, 2, 3, 1)
+
+info <- data.frame(
+  grade = 3:1,
+  desc = c("Excellent", "Good", "Poor"),
+  fail = c(F, F, T)
+)
+```
+
+```{r}
+id <- match(grades, info$grade)
+id
+
+#> [1] 3 2 2 1 3
+info[id, ]
+#>     grade      desc  fail
+#> 3       1      Poor  TRUE
+#> 2       2      Good FALSE
+#> 2.1     2      Good FALSE
+#> 1       3 Excellent FALSE
+#> 3.1     1      Poor  TRUE
+```
+
+### 4.5.3 Random samples and bootstraps (integer subsetting)
+
+```{r}
+df <- data.frame(x = c(1, 2, 3, 1, 2), y = 5:1, z = letters[1:5])
+
+# Randomly reorder
+df[sample(nrow(df)), ]
+#>   x y z
+#> 5 2 1 e
+#> 3 3 3 c
+#> 4 1 2 d
+#> 1 1 5 a
+#> 2 2 4 b
+
+# Select 3 random rows
+df[sample(nrow(df), 3), ]
+#>   x y z
+#> 4 1 2 d
+#> 2 2 4 b
+#> 1 1 5 a
+
+# Select 6 bootstrap replicates
+df[sample(nrow(df), 6, replace = TRUE), ]
+#>     x y z
+#> 5   2 1 e
+#> 5.1 2 1 e
+#> 5.2 2 1 e
+#> 2   2 4 b
+#> 3   3 3 c
+#> 3.1 3 3 c
+```
+
+### 4.5.4 Ordering (integer subsetting)
+
+```{r}
+x <- c("b", "c", "a")
+order(x)
+#> [1] 3 1 2
+x[order(x)]
+#> [1] "a" "b" "c"
+```
+
+By default, any missing values will be put at the end of the vector; however, you can remove them with na.last = NA or put them at the front with na.last = FALSE.
+
+```{r}
+# Randomly reorder df
+df2 <- df[sample(nrow(df)), 3:1]
+df2
+#>   z y x
+#> 5 e 1 2
+#> 1 a 5 1
+#> 4 d 2 1
+#> 2 b 4 2
+#> 3 c 3 3
+
+df2[order(df2$x), ]
+#>   z y x
+#> 1 a 5 1
+#> 4 d 2 1
+#> 5 e 1 2
+#> 2 b 4 2
+#> 3 c 3 3
+df2[, order(names(df2))]
+#>   x y z
+#> 5 2 1 e
+#> 1 1 5 a
+#> 4 1 2 d
+#> 2 2 4 b
+#> 3 3 3 c
+```
+
+### 4.5.5 Expanding aggregated counts (integer subsetting)
+
+```{r}
+df <- data.frame(x = c(2, 4, 1), y = c(9, 11, 6), n = c(3, 5, 1))
+df
+rep(1:nrow(df), df$n)
+#> [1] 1 1 1 2 2 2 2 2 3
+
+df[rep(1:nrow(df), df$n), ]
+#>     x  y n
+#> 1   2  9 3
+#> 1.1 2  9 3
+#> 1.2 2  9 3
+#> 2   4 11 5
+#> 2.1 4 11 5
+#> 2.2 4 11 5
+#> 2.3 4 11 5
+#> 2.4 4 11 5
+#> 3   1  6 1
+```
+
+### 4.5.6 Removing columns from data frames (character )
+
+```{r}
+df <- data.frame(x = 1:3, y = 3:1, z = letters[1:3])
+df$z <- NULL
+```
+
+```{r}
+df <- data.frame(x = 1:3, y = 3:1, z = letters[1:3])
+df[c("x", "y")]
+#>   x y
+#> 1 1 3
+#> 2 2 2
+#> 3 3 1
+```
+
+```{r}
+df[setdiff(names(df), "z")]
+#>   x y
+#> 1 1 3
+#> 2 2 2
+#> 3 3 1
+```
+
+### 4.5.7 Selecting rows based on a condition (logical subsetting)
+
+```{r}
+rm(mtcars)
+mtcars[mtcars$gear == 5, ]
+#>                 mpg cyl  disp  hp drat   wt qsec vs am gear carb
+#> Porsche 914-2  26.0   4 120.3  91 4.43 2.14 16.7  0  1    5    2
+#> Lotus Europa   30.4   4  95.1 113 3.77 1.51 16.9  1  1    5    2
+#> Ford Pantera L 15.8   8 351.0 264 4.22 3.17 14.5  0  1    5    4
+#> Ferrari Dino   19.7   6 145.0 175 3.62 2.77 15.5  0  1    5    6
+#> Maserati Bora  15.0   8 301.0 335 3.54 3.57 14.6  0  1    5    8
+
+mtcars[mtcars$gear == 5 & mtcars$cyl == 4, ]
+#>                mpg cyl  disp  hp drat   wt qsec vs am gear carb
+#> Porsche 914-2 26.0   4 120.3  91 4.43 2.14 16.7  0  1    5    2
+#> Lotus Europa  30.4   4  95.1 113 3.77 1.51 16.9  1  1    5    2
+```
+
+!(X & Y) is the same as !X | !Y
+!(X | Y) is the same as !X & !Y
+
+### 4.5.8 Boolean algebra versus sets (logical and integer )
+
+```{r}
+x <- sample(10) < 4
+which(x)
+#> [1] 2 3 4
+
+unwhich <- function(x, n) {
+  out <- rep_len(FALSE, n)
+  out[x] <- TRUE
+  out
+}
+unwhich(which(x), 10)
+#>  [1] FALSE  TRUE  TRUE  TRUE FALSE FALSE FALSE FALSE FALSE FALSE
+```
+
+```{r}
+(x1 <- 1:10 %% 2 == 0)
+#>  [1] FALSE  TRUE FALSE  TRUE FALSE  TRUE FALSE  TRUE FALSE  TRUE
+(x2 <- which(x1))
+#> [1]  2  4  6  8 10
+(y1 <- 1:10 %% 5 == 0)
+#>  [1] FALSE FALSE FALSE FALSE  TRUE FALSE FALSE FALSE FALSE  TRUE
+(y2 <- which(y1))
+#> [1]  5 10
+
+# X & Y <-> intersect(x, y)
+x1 & y1
+#>  [1] FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE  TRUE
+intersect(x2, y2)
+#> [1] 10
+
+# X | Y <-> union(x, y)
+x1 | y1
+#>  [1] FALSE  TRUE FALSE  TRUE  TRUE  TRUE FALSE  TRUE FALSE  TRUE
+union(x2, y2)
+#> [1]  2  4  6  8 10  5
+
+# X & !Y <-> setdiff(x, y)
+x1 & !y1
+#>  [1] FALSE  TRUE FALSE  TRUE FALSE  TRUE FALSE  TRUE FALSE FALSE
+setdiff(x2, y2)
+#> [1] 2 4 6 8
+
+# xor(X, Y) <-> setdiff(union(x, y), intersect(x, y))
+xor(x1, y1)
+#>  [1] FALSE  TRUE FALSE  TRUE  TRUE  TRUE FALSE  TRUE FALSE FALSE
+setdiff(union(x2, y2), intersect(x2, y2))
+#> [1] 2 4 6 8 5
+```
+
+### 4.5.9 Exercises
+
+#### 1. How would you randomly permute the columns of a data frame? (This is an important technique in random forests.) Can you simultaneously permute the rows and columns in one step?
+
+```{r}
+x <- matrix(1:25, ncol = 5)
+x
+x[,sample(ncol(x))]
+x[sample(nrow(x)),sample(ncol(x))]
+```
+
+#### 2. How would you select a random sample of m rows from a data frame? What if the sample had to be contiguous (i.e., with an initial row, a final row, and every row in between)?
+
+```{r}
+m <- 3
+start <- sample(nrow(x) - m + 1, 1)
+end <- start + m -1
+x[start:end, , drop = F]
+```
+
+#### 3. How could you put the columns in a data frame in alphabetical order?
+
+```{r}
+df <- data.frame(a = 1, b = 2, d = 4, e = 5, c = 3)
+df
+df[,order(df)]
+```
+
