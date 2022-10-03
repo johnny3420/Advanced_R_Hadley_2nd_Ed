@@ -1,0 +1,46 @@
+---
+title: "5_Control_Flow_ScratchWork"
+output: html_document
+date: "2022-10-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+```
+
+
+# Questions
+
+1. What does %% do?
+
+```{r}
+x <- 1:10
+x %% 5
+x %% 5 == 0
+?`%%`
+```
+
+
+
+2. What does case_when do?
+
+3. 5.2.4 #2
+
+4. Dangers of indices in loops
+
+4.1 When might you use next or break in a for loop
+
+4.2 What is the difference between for, while, and repeat
+
+5. 5.3.3 #1
+
+6. 5.3.3, #3
+
+
+
+rclub assignment for next week is 6.1-6.5

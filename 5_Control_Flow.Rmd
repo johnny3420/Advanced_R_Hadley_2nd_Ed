@@ -297,6 +297,8 @@ out <- vector("list", length(x))
 for (i in 1:length(x)) {
   out[i] <- x[i] ^ 2
 }
+
+
 out
 ```
 
@@ -309,6 +311,12 @@ xs <- c(1, 2, 3)
 for (x in xs) {
   xs <- c(xs, x * 2)
 }
+xs
+xs <- c(xs, xs[1] * 2)
+xs
+xs <- c(xs, xs[2] * 2)
+xs
+xs <- c(xs, xs[3] * 2)
 xs
 ```
 It gets one element added on to the end each time
@@ -323,5 +331,5 @@ for (i in 1:3) {
 }
 ```
 
-Index times 3
+Index times 2, still reset on next iteration
 
