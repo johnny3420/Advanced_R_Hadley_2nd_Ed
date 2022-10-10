@@ -194,6 +194,7 @@ head(a[a == 0])
 is.primitive(`-`)
 is.primitive("scan")
 # Are primitive functions
+rm(a)
 ```
 
 c.  How could you adapt the code to find all primitive functions?
@@ -566,3 +567,287 @@ The default value for x is run the function stop with the argument "Error!". Whi
 6. How many arguments are required when calling library()?
 
 None
+
+## 6.6 Dot-Dot-Dot
+
+```{r}
+i01 <- function(y, z) {
+  list(y = y, z = z)
+}
+
+i02 <- function(x, ...) {
+  i01(...)
+}
+
+str(i02(x = 1, y = 2, z = 3))
+
+```
+
+```{r}
+i03 <- function(...) {
+  list(first = ..1, third = ..3)
+}
+str(i03(1, 2, 3))
+```
+
+```{r}
+i04 <- function(...) {
+  list(...)
+}
+str(i04(a = 1, b = 2))
+```
+
+```{r}
+x <- list(c(1, 3, NA), c(4, NA, 6))
+str(lapply(x, mean, na.rm = TRUE))
+```
+
+```{r}
+print(factor(letters), max.levels = 4)
+
+print(y ~ x, showEnv = TRUE)
+```
+
+```{r}
+sum(1, 2, NA, na_rm = TRUE)
+```
+
+#### 6.6.1 Exercises
+
+1. Explain the following results:
+```{r}
+sum(1, 2, 3)
+mean(1, 2, 3)
+
+sum(1, 2, 3, na.omit = TRUE)
+mean(1, 2, 3, na.omit = TRUE)
+```
+As expected. The first argument of mean is the vector to calculate over which in this case is the single element vector of 1, the 2 and 3 are additional arguments. The na.omit = TRUE is sum is equal to 1 and a typo of the argument na.rm so it get added. In the last it's not included because it's an argument with a typo that gets passed on.
+
+2. Explain how to find the documentation for the named arguments in the following function call:
+
+```{r}
+plot(1:10, col = "red", pch = 20, xlab = "x", col.lab = "blue")
+```
+
+Follow the help documentation
+
+```{r}
+str(plot)
+#?plot
+```
+
+3. Why does plot(1:10, col = "red") only colour the points, not the axes or labels? Read the source code of plot.default() to find out.
+
+```{r}
+plot(1:10, col = "red")
+```
+
+```{r}
+plot.default
+```
+
+It is also expected. We set the color for the points, but did not for the labels.
+
+## 6.7 Exiting a function
+### 6.7.1 Implicit versus explicit returns
+
+```{r}
+# Implicitly, where the last evaluated expression is the return value:
+j01 <- function(x) {
+  if (x < 10) {
+    0
+  } else {
+    10
+  }
+}
+j01(5)
+j01(15)
+```
+
+```{r}
+# Explicitly, by calling return():
+j02 <- function(x) {
+  if (x < 10) {
+    return(0)
+  } else {
+    return(10)
+  }
+}
+j02(5)
+j02(15)
+```
+
+### 6.7.2 Invisible values
+
+```{r}
+j03 <- function() 1
+j03()
+```
+
+```{r}
+j04 <- function() invisible(1)
+j04()
+```
+
+```{r}
+print(j04())
+
+(j04())
+```
+
+```{r}
+str(withVisible(j04()))
+```
+
+```{r}
+a <- 2
+(a <- 2)
+```
+
+```{r}
+a <- b <- c <- d <- 2
+```
+
+### 6.7.3 Errors
+
+```{r, error = T}
+j05 <- function() {
+  stop("I'm an error")
+  return(10)
+}
+j05()
+```
+
+### 6.7.4 Exit handlers
+
+```{r, error = T}
+j06 <- function(x) {
+  cat("Hello\n")
+  on.exit(cat("Goodbye!\n"), add = TRUE)
+  
+  if (x) {
+    return(10)
+  } else {
+    stop("Error")
+  }
+}
+
+j06(TRUE)
+
+
+j06(FALSE)
+```
+
+```{r, eval = F}
+cleanup <- function(dir, code) {
+  old_dir <- setwd(dir)
+  on.exit(setwd(old_dir), add = TRUE)
+  
+  old_opt <- options(stringsAsFactors = FALSE)
+  on.exit(options(old_opt), add = TRUE)
+}
+```
+
+```{r}
+with_dir <- function(dir, code) {
+  old <- setwd(dir)
+  on.exit(setwd(old), add = TRUE)
+
+  force(code)
+}
+
+getwd()
+with_dir("~", getwd())
+getwd()
+```
+
+```{r}
+j08 <- function() {
+  on.exit(message("a"), add = TRUE)
+  on.exit(message("b"), add = TRUE)
+}
+j08()
+```
+
+```{r}
+j09 <- function() {
+  on.exit(message("a"), add = TRUE, after = FALSE)
+  on.exit(message("b"), add = TRUE, after = FALSE)
+}
+j09()
+```
+
+#### 6.7.5 Exercises
+
+1. What does load() return? Why don’t you normally see these values?
+```{r}
+load
+```
+
+Load will load the objects from a file and add them to the environment.  Nothing is shown since verbose is set to false.
+
+2. What does write.table() return? What would be more useful?
+
+```{r}
+write.table
+# write.table(a, "test.txt")
+```
+
+nothing is printed to the screen. Would be useful if it told you the table was correctly saved.
+
+3. How does the chdir parameter of source() compare to with_dir()? Why might you prefer one to the other?
+
+```{r}
+?source
+?with_dir
+```
+
+source lets you give the file path and the chdir parameter let's you use the files directory as the working directory. May have to change directory back. with_dir lets you set a new working directory for the code you're going to execute and then returns back to the original working directory. Both depend on what other files you want to use for your execution
+
+4. Write a function that opens a graphics device, runs the supplied code, and closes the graphics device (always, regardless of whether or not the plotting code works).
+
+```{r}
+trash <- function(){
+  on.exit(dev.off(), add = TRUE)
+  png("test.png")
+  plot(1:10)
+}
+trash()
+```
+
+5. We can use on.exit() to implement a simple version of capture.output().
+
+```{r, error = T}
+capture.output2 <- function(code) {
+  temp <- tempfile()
+  on.exit(file.remove(temp), add = TRUE, after = TRUE)
+
+  sink(temp)
+  on.exit(sink(), add = TRUE, after = TRUE)
+
+  force(code)
+  readLines(temp)
+}
+capture.output(cat("a", "b", "c", sep = "\n"))
+capture.output2(cat("a", "b", "c", sep = "\n"))
+```
+
+Huh
+
+## 6.8 Function forms
+
+* prefix: the function name comes before its arguments, like foofy(a, b, c). These constitute of the majority of function calls in R.
+
+* infix: the function name comes in between its arguments, like x + y. Infix forms are used for many mathematical operators, and for user-defined functions that begin and end with %.
+
+* replacement: functions that replace values by assignment, like names(df) <- c("a", "b", "c"). They actually look like prefix functions.
+
+* special: functions like [[, if, and for. While they don’t have a consistent structure, they play important roles in R’s syntax.
+
+### 6.8.1 Rewriting to prefix form
+
+```{r}
+
+```
+
