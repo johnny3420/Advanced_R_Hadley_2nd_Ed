@@ -847,7 +847,232 @@ Huh
 
 ### 6.8.1 Rewriting to prefix form
 
-```{r}
+```{r, error = T}
+x + y
+`+`(x, y)
 
+names(df) <- c("x", "y", "z")
+`names<-`(df, c("x", "y", "z"))
+
+for(i in 1:10) print(i)
+`for`(i, 1:10, print(i))
 ```
 
+```{r}
+`(` <- function(e1) {
+  if (is.numeric(e1) && runif(1) < 0.1) {
+    e1 + 1
+  } else {
+    e1
+  }
+}
+replicate(50, (1 + 2))
+rm("(")
+```
+
+```{r}
+add <- function(x, y) x + y
+lapply(list(1:3, 4:5), add, 3)
+```
+
+```{r}
+lapply(list(1:3, 4:5), `+`, 3)
+```
+
+### 6.8.2 Prefix form
+
+```{r, error = T}
+k01 <- function(abcdef, bcde1, bcde2) {
+  list(a = abcdef, b1 = bcde1, b2 = bcde2)
+}
+str(k01(1, 2, 3))
+
+str(k01(2, 3, abcdef = 1))
+
+
+# Can abbreviate long argument names:
+str(k01(2, 3, a = 1))
+
+# But this doesn't work because abbreviation is ambiguous
+str(k01(1, 3, b = 1))
+```
+```{r}
+options(warnPartialMatchArgs = TRUE)
+x <- k01(a = 1, 2, 3)
+```
+
+### 6.8.3 Infix functions
+
+```{r}
+`%+%` <- function(a, b) paste0(a, b)
+"new " %+% "string"
+```
+
+```{r}
+`% %` <- function(a, b) paste(a, b)
+`%/\\%` <- function(a, b) paste(a, b)
+
+"a" % % "b"
+"a" %/\% "b"
+```
+
+```{r}
+`%-%` <- function(a, b) paste0("(", a, " %-% ", b, ")")
+"a" %-% "b" %-% "c"
+```
+
+```{r}
+-1
++10
+```
+
+### 6.8.4 Replacement functions
+
+```{r}
+`second<-` <- function(x, value) {
+  x[2] <- value
+  x
+}
+```
+
+```{r}
+x <- 1:10
+second(x) <- 5L
+x
+```
+
+```{r}
+x <- 1:10
+tracemem(x)
+
+second(x) <- 6L
+untracemem(x)
+```
+
+```{r}
+`modify<-` <- function(x, position, value) {
+  x[position] <- value
+  x
+}
+modify(x, 1) <- 10
+x
+```
+
+```{r}
+x <- `modify<-`(x, 1, 10)
+```
+
+```{r}
+x <- c(a = 1, b = 2, c = 3)
+names(x)
+
+names(x)[2] <- "two"
+names(x)
+```
+
+```{r}
+`*tmp*` <- x
+x <- `names<-`(`*tmp*`, `[<-`(names(`*tmp*`), 2, "two"))
+rm(`*tmp*`)
+```
+
+### 6.8.5 Special forms
+
+```{r}
+`for`
+```
+
+#### 6.8.6 Exercises
+
+1. Rewrite the following code snippets into prefix form:
+
+```{r}
+1 + 2 + 3
+
+`+`(1, `+`(2,3))
+
+1 + (2 + 3)
+
+`+`(1, `(`(`+`(2,3)))
+
+x <- 1:10
+n <- 3
+
+if (length(x) <= 5) x[[5]] else x[[n]]
+
+`if`(length(x) <= 5, `[[`(x,5), `[[`(x,n))
+```
+
+2. Clarify the following list of odd function calls:
+
+```{r}
+set.seed(1)
+x <- sample(replace = TRUE, 20, x = c(1:10, NA))
+x
+
+set.seed(1)
+x <- sample(x = c(1:10, NA), size = 20, replace = TRUE)
+x
+
+set.seed(1)
+y <- runif(min = 0, max = 1, 20)
+y
+
+set.seed(1)
+y <- runif(n = 20, min = 0, max = 1)
+y
+
+
+cor(m = "k", y = y, u = "p", x = x)
+cor(x = x, y = y, use = "pairwise.complete.obs", method = "kendall")
+```
+
+3. Explain why the following code fails:
+
+```{r}
+modify <- function(x, position, value) {
+  x[position] <- value
+  x
+}
+x
+#modify(get("x"), 1) <- 10
+modify(get("x"), 1, 10)
+```
+
+Modify in our case takes 3 arguments. Code shows 2
+
+4. Create a replacement function that modifies a random location in a vector.
+
+```{r}
+`whoops<-` <- function(x, value){
+  changed <- sample(1:length(x), size = 1)
+  x[changed] <- value
+  x
+}
+
+x
+whoops(x) <- 42069
+x
+```
+
+5. Write your own version of + that pastes its inputs together if they are character vectors but behaves as usual otherwise. In other words, make this code work:
+
+```{r}
+`%crapadd%` <- function(a, b){
+  if(is.numeric(a) & is.numeric(b)) a + b else paste0(a,b)
+}
+
+1 %crapadd% 2
+
+"a" %crapadd% "b"
+
+1 %crapadd% "b"
+```
+
+6. Create a list of all the replacement functions found in the base package. Which ones are primitive functions? (Hint: use apropos().)
+
+7. What are valid names for user-created infix functions?
+
+8. Create an infix xor() operator.
+
+9. Create infix versions of the set functions intersect(), union(), and setdiff(). You might call them %n%, %u%, and %/% to match conventions from mathematics.
