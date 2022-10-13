@@ -1071,8 +1071,57 @@ x
 
 6. Create a list of all the replacement functions found in the base package. Which ones are primitive functions? (Hint: use apropos().)
 
+```{r}
+(replacers <- apropos("<-$", where = T, mode = "function"))
+
+# search() A character vector, starting with ".GlobalEnv", and ending with "package:base" which is R's base package required always.
+(base_replacers <- replacers[names(replacers) == length(search())])
+
+mget(base_replacers, envir = baseenv()) %>%
+  Filter(is.primitive, .) %>%
+  names()
+```
+
+17 are primitive functions
+
 7. What are valid names for user-created infix functions?
+
+Anything except "%" as long as it's properly escaped
 
 8. Create an infix xor() operator.
 
+```{r}
+xor
+
+x <- rep(c(T,F), 5)
+y <- rep(c(T,F), each = 5)
+
+`%xor%` <- function(a, b){
+  (a | b) & !(a & b)
+}
+
+xor(x,y)
+x %xor% y
+```
+
+
 9. Create infix versions of the set functions intersect(), union(), and setdiff(). You might call them %n%, %u%, and %/% to match conventions from mathematics.
+
+```{r}
+x <- 1:10
+y <- 5:14
+`%n%` <- function(a,b) intersect(a,b)
+`%u%` <- function(a,b) union(a,b)
+`%/%` <- function(a,b) setdiff(a,b)
+
+intersect(x,y)
+x %n% y
+
+union(x,y)
+x %u% y
+
+setdiff(x,y)
+x %/% y
+
+```
+
