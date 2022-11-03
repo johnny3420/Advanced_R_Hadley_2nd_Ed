@@ -1,0 +1,433 @@
+---
+title: "8_Conditions"
+output: pdf_document
+date: "2022-11-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 8. Conditions
+## 8.1 Introduction
+### 8.1.1 Prerequisites
+
+```{r}
+library(rlang)
+```
+
+## 8.2 Signalling conditions
+
+```{r, error = T}
+stop("This is what an error looks like")
+
+warning("This is what a warning looks like")
+
+message("This is what a message looks like")
+```
+
+### 8.2.1 Errors
+
+```{r, error = T}
+f <- function() g()
+g <- function() h()
+h <- function() stop("This is an error!")
+
+f()
+```
+
+```{r, error = T}
+h <- function() stop("This is an error!", call. = FALSE)
+f()
+```
+
+```{r, error = T}
+h <- function() abort("This is an error!")
+f()
+```
+
+### 8.2.2 Warnings
+
+```{r}
+fw <- function() {
+  cat("1\n")
+  warning("W1")
+  cat("2\n")
+  warning("W2")
+  cat("3\n")
+  warning("W3")
+}
+```
+
+```{r}
+# Setting warn to 0 still doesn't fix immediate printing
+fw()
+```
+
+```{r}
+formals(1)
+
+file.remove("this-file-doesn't-exist")
+
+lag(1:3, k = 1.5)
+
+as.numeric(c("18", "30", "50+", "345,678"))
+```
+
+### 8.2.3 Messages
+
+```{r}
+fm <- function() {
+  cat("1\n")
+  message("M1")
+  cat("2\n")
+  message("M2")
+  cat("3\n")
+  message("M3")
+}
+
+fm()
+```
+
+```{r}
+cat("Hi!\n")
+
+message("Hi!")
+```
+
+#### 8.2.4 Exercises
+
+1. Write a wrapper around file.remove() that throws an error if the file to be deleted does not exist.
+
+```{r, error = T}
+better.file.remove <- function(file){
+  if(file.exists(file)){
+    file.remove(file)
+  } else{
+    stop("File does not exist")
+  }
+}
+
+better.file.remove("test.txt")
+file.create("test.txt")
+better.file.remove("test.txt")
+
+```
+
+2. What does the appendLF argument to message() do? How is it related to cat()?
+
+```{r}
+message("No Breaks for me", appendLF = F)
+message("Now a break", appendLF = T)
+message("Woo", appendLF = T)
+
+cat("Hi")
+cat("Hello")
+```
+
+Basically you can decide to extend the message you already have by setting appendLF to False. `cat()` by default is similar to `message(appendLF = F)`
+
+## 8.3 Ignoring conditions
+
+```{r, error = T}
+f1 <- function(x) {
+  log(x)
+  10
+}
+f1("x")
+```
+
+```{r}
+f2 <- function(x) {
+  try(log(x))
+  10
+}
+f2("a")
+```
+
+```{r}
+default <- NULL
+try(default <- read.csv("possibly-bad-input.csv"), silent = TRUE)
+```
+
+```{r}
+suppressWarnings({
+  warning("Uhoh!")
+  warning("Another warning")
+  1
+})
+```
+
+```{r}
+suppressMessages({
+  message("Hello there")
+  2
+})
+```
+
+```{r}
+suppressWarnings({
+  message("You can still see me")
+  3
+})
+```
+
+## 8.4 Handling conditions
+
+```{r, error=T}
+tryCatch(
+  error = function(cnd) {
+    # code to run when error is thrown
+  },
+   code_to_run_while_handlers_are_active
+)
+
+withCallingHandlers(
+  warning = function(cnd) {
+    # code to run when warning is signaled
+  },
+  message = function(cnd) {
+    # code to run when message is signaled
+  },
+    code_to_run_while_handlers_are_active
+)
+```
+
+### 8.4.1 Condition objects
+
+```{r}
+cnd <- catch_cnd(stop("An error"))
+str(cnd)
+```
+
+### 8.4.2 Exiting handlers
+
+```{r}
+f3 <- function(x) {
+  tryCatch(
+    error = function(cnd) NA,
+    log(x)
+  )
+}
+
+f3("x")
+f3(10)
+```
+
+```{r}
+tryCatch(
+  error = function(cnd) 10,
+  1 + 1
+)
+
+tryCatch(
+  error = function(cnd) 10,
+  {
+    message("Hi!")
+    1 + 1
+  }
+)
+```
+
+```{r}
+tryCatch(
+  message = function(cnd) "There",
+  {
+    message("Here")
+    stop("This code is never run!")
+  }
+)
+```
+
+```{r}
+tryCatch(
+  error = function(cnd) {
+    paste0("--", conditionMessage(cnd), "--")
+  },
+  stop("This is an error")
+)
+```
+
+```{r}
+path <- tempfile()
+tryCatch(
+  {
+    writeLines("Hi!", path)
+    # ...
+  },
+  finally = {
+    # always run
+    unlink(path)
+  }
+)
+```
+
+### 8.4.3 Calling handlers
+
+```{r}
+tryCatch(
+  message = function(cnd) cat("Caught a message!\n"), 
+  {
+    message("Someone there?")
+    message("Why, yes!")
+  }
+)
+
+withCallingHandlers(
+  message = function(cnd) cat("Caught a message!\n"), 
+  {
+    message("Someone there?")
+    message("Why, yes!")
+  }
+)
+```
+
+```{r}
+withCallingHandlers(
+  message = function(cnd) message("Second message"),
+  message("First message")
+)
+```
+
+```{r}
+# Bubbles all the way up to default handler which generates the message
+withCallingHandlers(
+  message = function(cnd) cat("Level 2\n"),
+  withCallingHandlers(
+    message = function(cnd) cat("Level 1\n"),
+    message("Hello")
+  )
+)
+```
+
+```{r}
+# Muffles the default handler which prints the messages
+withCallingHandlers(
+  message = function(cnd) {
+    cat("Level 2\n")
+    cnd_muffle(cnd)
+  },
+  withCallingHandlers(
+    message = function(cnd) cat("Level 1\n"),
+    message("Hello")
+  )
+)
+```
+
+```{r}
+# Muffles level 2 handler and the default handler
+withCallingHandlers(
+  message = function(cnd) cat("Level 2\n"),
+  withCallingHandlers(
+    message = function(cnd) {
+      cat("Level 1\n")
+      cnd_muffle(cnd)
+    },
+    message("Hello")
+  )
+)
+```
+
+cnd doesn't pass to tlevel 2 and is muffled by level 1
+
+### 8.4.4 Call stacks
+
+```{r}
+f <- function() g()
+g <- function() h()
+h <- function() message("!")
+```
+
+```{r}
+withCallingHandlers(f(), message = function(cnd) {
+  lobstr::cst()
+  cnd_muffle(cnd)
+})
+```
+
+```{r}
+tryCatch(f(), message = function(cnd) lobstr::cst())
+```
+
+#### 8.4.5 Exercises
+
+1. What extra information does the condition generated by `abort()` contain compared to the condition generated by `stop()` i.e. what’s the difference between these two objects? Read the help for `?abort` to learn more.
+
+```{r, error = T}
+catch_cnd(stop("An error"))
+catch_cnd(abort("An error"))
+```
+
+abort shows you the backtrace of what triggered the error
+
+2. Predict the results of evaluating the following code
+
+```{r}
+show_condition <- function(code) {
+  tryCatch(
+    error = function(cnd) "error",
+    warning = function(cnd) "warning",
+    message = function(cnd) "message",
+    {
+      code
+      NULL
+    }
+  )
+}
+
+show_condition(stop("!"))
+show_condition(10)
+show_condition(warning("?!"))
+show_condition({
+  10
+  message("?")
+  warning("?!")
+})
+```
+
+"error", "NULL", "warning", "message"
+
+3. Explain the results of running this code:
+
+```{r}
+withCallingHandlers(
+  message = function(cnd) message("b"),
+  withCallingHandlers(
+    message = function(cnd) message("a"),
+    message("c")
+  )
+)
+```
+
+`message("c")` triggers the first handler which calls `message(a)` which triggers the second handler. The second handler then messages "b", then the message from the first handler comes through with "a" which retriggers the second handler which sends "b" again. Finally the originally message of "c" is printed
+
+4. Read the source code for `catch_cnd()` and explain how it works.
+
+```{r}
+catch_cnd
+```
+
+First checks to see if classes is provided as a character object. Creates a list object called handlers which holds the different types of conditions to be caught. Then evaluates the expression using `tryCatch`
+
+5. How could you rewrite `show_condition()` to use a single handler?
+
+```{r}
+show_condition
+```
+
+```{r}
+show_condition2 <- function(code) {
+  tryCatch(
+    condition = function(cnd) {
+      if (inherits(cnd, "error"))   return("error")
+      if (inherits(cnd, "warning")) return("warning")
+      if (inherits(cnd, "message")) return("message")
+    },
+    {
+      code
+      NULL
+    }
+  )
+}
+```
+
