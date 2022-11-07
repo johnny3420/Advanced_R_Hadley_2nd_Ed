@@ -60,6 +60,7 @@ fw <- function() {
 ```
 
 ```{r}
+options(warn = 0)
 # Setting warn to 0 still doesn't fix immediate printing
 fw()
 ```
@@ -198,6 +199,8 @@ withCallingHandlers(
 ```{r}
 cnd <- catch_cnd(stop("An error"))
 str(cnd)
+conditionMessage(cnd)
+conditionCall(cnd)
 ```
 
 ### 8.4.2 Exiting handlers
@@ -419,9 +422,9 @@ show_condition
 show_condition2 <- function(code) {
   tryCatch(
     condition = function(cnd) {
-      if (inherits(cnd, "error"))   return("error")
-      if (inherits(cnd, "warning")) return("warning")
-      if (inherits(cnd, "message")) return("message")
+      if(is_error(cnd))   return("error")
+      if(is_warning(cnd)) return("warning")
+      if(is_message(cnd)) return("message")
     },
     {
       code
@@ -429,5 +432,14 @@ show_condition2 <- function(code) {
     }
   )
 }
+
+show_condition2(stop("!"))
+show_condition2(10)
+show_condition2(warning("?!"))
+show_condition2({
+  10
+  message("?")
+  warning("?!")
+})
 ```
 
