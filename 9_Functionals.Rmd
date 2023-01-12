@@ -301,3 +301,229 @@ map(bootstraps, ~ lm(mpg ~ disp, data = .x)) %>%
 ```
 
 ## 9.3 Purrr style
+
+```{r}
+by_cyl <- split(mtcars, mtcars$cyl)
+```
+
+```{r}
+by_cyl %>% 
+  map(~ lm(mpg ~ wt, data = .x)) %>% 
+  map(coef) %>% 
+  map_dbl(2)
+```
+
+```{r}
+by_cyl %>% 
+  lapply(function(data) lm(mpg ~ wt, data = data)) %>% 
+  lapply(coef) %>% 
+  vapply(function(x) x[[2]], double(1))
+```
+
+```{r}
+models <- lapply(by_cyl, function(data) lm(mpg ~ wt, data = data))
+vapply(models, function(x) coef(x)[[2]], double(1))
+```
+
+```{r}
+slopes <- double(length(by_cyl))
+for (i in seq_along(by_cyl)) {
+  model <- lm(mpg ~ wt, data = by_cyl[[i]])
+  slopes[[i]] <- coef(model)[[2]]
+}
+slopes
+```
+
+### 9.4 Map variants
+
+![](map__functions.png)
+
+### 9.4.1 Same type of output as input: `modify()`
+
+```{r}
+df <- data.frame(
+  x = 1:3,
+  y = 6:4
+)
+
+map(df, ~ .x * 2)
+```
+
+```{r}
+modify(df, ~ .x * 2)
+```
+
+```{r}
+df <- modify(df, ~ .x * 2)
+df
+```
+
+```{r}
+simple_modify <- function(x, f, ...) {
+  for (i in seq_along(x)) {
+    x[[i]] <- f(x[[i]], ...)
+  }
+  x
+}
+```
+
+```{r}
+modify_if(df, is.numeric, ~ .x * 2)
+```
+
+
+### 9.4.2 Two inputs: `map2()` and friends
+
+```{r}
+xs <- map(1:8, ~ runif(10))
+xs[[1]][[1]] <- NA
+ws <- map(1:8, ~ rpois(10, 5) + 1)
+```
+
+```{r}
+map_dbl(xs, mean)
+```
+
+```{r, error = T}
+map_dbl(xs, weighted.mean, w = ws)
+```
+
+```{r}
+map2_dbl(xs, ws, weighted.mean)
+```
+
+```{r}
+map2_dbl(xs, ws, weighted.mean, na.rm = TRUE)
+```
+
+```{r}
+simple_map2 <- function(x, y, f, ...) {
+  out <- vector("list", length(x))
+  for (i in seq_along(x)) {
+    out[[i]] <- f(x[[i]], y[[i]], ...)
+  }
+  out
+}
+```
+
+### 9.4.3 No outputs: `walk()` and friends
+
+```{r}
+welcome <- function(x) {
+  cat("Welcome ", x, "!\n", sep = "")
+}
+names <- c("Hadley", "Jenny")
+
+map(names, welcome)
+```
+
+```{r}
+walk(names, welcome)
+```
+
+```{r}
+temp <- tempfile()
+dir.create(temp)
+
+cyls <- split(mtcars, mtcars$cyl)
+paths <- file.path(temp, paste0("cyl-", names(cyls), ".csv"))
+walk2(cyls, paths, write.csv)
+
+dir(temp)
+```
+
+### 9.4.4 Iterating over values and indices
+
+```{r}
+imap_chr(iris, ~ paste0("The first value of ", .y, " is ", .x[[1]]))
+```
+
+```{r}
+x <- map(1:6, ~ sample(1000, 10))
+imap_chr(x, ~ paste0("The highest value of ", .y, " is ", max(.x)))
+```
+
+### 9.4.5 Any number of inputs: pmap() and friends
+
+```{r}
+pmap_dbl(list(xs, ws), weighted.mean)
+```
+
+```{r}
+pmap_dbl(list(xs, ws), weighted.mean, na.rm = T)
+```
+
+```{r}
+trims <- c(0, 0.1, 0.2, 0.5)
+x <- rcauchy(1000)
+
+pmap_dbl(list(trim = trims), mean, x = x)
+```
+
+```{r}
+params <- tibble::tribble(
+  ~ n, ~ min, ~ max,
+   1L,     0,     1,
+   2L,    10,   100,
+   3L,   100,  1000
+)
+
+# runif(n, min, max)
+pmap(params, runif)
+```
+
+#### 9.4.6 Exercises
+
+1. Explain the results of `modify(mtcars, 1)`
+
+```{r}
+modify(mtcars, 1)
+```
+
+The rows are all the same. The call extracts the first row of the `mtcars` data frame. Then since modify returns the same size output as input, it just recycles it for the original length of `mtcars`
+
+2. Rewrite the following code to use `iwalk()` instead of `walk2()`. What are the advantages and disadvantages?
+
+```{r}
+cyls <- split(mtcars, mtcars$cyl)
+paths <- file.path(temp, paste0("cyl-", names(cyls), ".csv"))
+walk2(cyls, paths, write.csv)
+
+names(cyls) <- paths
+iwalk(cyls, ~write.csv(.x, .y))
+```
+
+3. Explain how the following code transforms a data frame using functions stored in a list.
+
+```{r}
+trans <- list(
+  disp = function(x) x * 0.0163871,
+  am = function(x) factor(x, labels = c("auto", "manual"))
+)
+
+nm <- names(trans)
+mtcars[nm] <- map2(trans, mtcars[nm], function(f, var) f(var))
+```
+
+Compare and contrast the map2() approach to this map() approach:
+
+```{r}
+mtcars[nm] <- map(nm, ~ trans[[.x]](mtcars[[.x]]))
+```
+
+
+The two functions in the list are disp for displacement which calculates displacement with a fixed value and am which converts the column to a factor column of either auto or manual for levels. nm is the names of the functions. The function them modifies the the two columns of mtcars which match the names of the two functions by iterating over similar indexes. In this case f would be our x and var would be our y. The second directly iterates over the names contained in the nm object
+
+4. What does `write.csv()` return, i.e. what happens if you use it with `map2()` instead of `walk2()`
+
+```{r}
+cyls <- split(mtcars, mtcars$cyl)
+paths <- file.path(temp, paste0("cyl-", names(cyls), ".csv"))
+walk2(cyls, paths, write.csv)
+map2(cyls, paths, write.csv)
+
+```
+
+It returns a list of length 3 with NULL as the return value which we don't care about.
+
+## 9.5 Reduce family
