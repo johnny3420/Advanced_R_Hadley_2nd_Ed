@@ -202,7 +202,7 @@ as_mapper(list(1, "a", 2))
 as_mapper(list(1, attr_getter("a")))
 ```
 
-Looks like it is using `pluck_raw`. Get attributes wiht `attr_getter`
+Looks like it is using `pluck_raw`. Get attributes with `attr_getter`
 
 2.  `map(1:3, ~ runif(2))` is a useful pattern for generating random numbers, but `map(1:3, runif(2))` is not. Why not? Can you explain why it returns the result that it does?
 
@@ -213,6 +213,15 @@ map(1:3, ~ runif(2))
 ```{r}
 map(1:3, runif(2))
 ```
+
+```{r}
+as_mapper(map(1:3, runif(2)))
+```
+
+```{r}
+as_mapper(runif(2))
+```
+
 
 First one creates an anonymous function which then generates 2 random numbers for each of the 3 iterations. The second only generates one set of random numbers which is fed into map and results in maps default values being spit out when piped to `as_mapper`
 
@@ -527,3 +536,205 @@ map2(cyls, paths, write.csv)
 It returns a list of length 3 with NULL as the return value which we don't care about.
 
 ## 9.5 Reduce family
+
+### 9.5.1 Basics
+```{r}
+l <- map(1:4, ~ sample(1:10, 15, replace = T))
+str(l)
+```
+
+```{r}
+out <- l[[1]]
+out <- intersect(out, l[[2]])
+out <- intersect(out, l[[3]])
+out <- intersect(out, l[[4]])
+out
+```
+
+```{r}
+reduce(l, intersect)
+```
+
+```{r}
+reduce(l, union)
+```
+
+```{r}
+simple_reduce <- function(x, f) {
+  out <- x[[1]]
+  for (i in seq(2, length(x))) {
+    out <- f(out, x[[i]])
+  }
+  out
+}
+```
+
+### 9.5.2 Accumulate
+
+```{r}
+accumulate(l, intersect)
+```
+
+```{r}
+x <- c(4, 3, 10)
+reduce(x, `+`)
+```
+
+```{r}
+accumulate(x, `+`)
+```
+
+### 9.5.3 Output types
+
+```{r}
+reduce(1, `+`)
+```
+
+```{r}
+reduce("a", `+`)
+```
+
+```{r, error = T}
+reduce(integer(), `+`)
+```
+
+```{r}
+reduce(integer(), `+`, .init = 0)
+```
+
+```{r, error = T}
+reduce("a", `+`, .init = 0)
+```
+
+```{r}
+sum(integer())  # x + 0 = x
+prod(integer()) # x * 1 = x
+min(integer())  # min(x, Inf) = x
+max(integer())  # max(x, -Inf) = x
+```
+
+### 9.5.4 Multiple inputs
+
+### 9.5.5 Map-reduce
+
+## 9.6 Predicate functionals
+### 9.6.1 Basics
+```{r}
+df <- data.frame(x = 1:3, y = c("a", "b", "c"))
+detect(df, is.factor)
+```
+
+```{r}
+detect_index(df, is.factor)
+```
+
+```{r}
+str(keep(df, is.factor))
+```
+
+```{r}
+str(discard(df, is.factor))
+```
+
+### 9.6.2 Map variants
+
+```{r}
+df <- data.frame(
+  num1 = c(0, 10, 20),
+  num2 = c(5, 6, 7),
+  chr1 = c("a", "b", "c"),
+  stringsAsFactors = FALSE
+)
+df
+```
+
+```{r}
+str(map_if(df, is.numeric, mean))
+```
+
+```{r}
+str(modify_if(df, is.numeric, mean))
+```
+
+```{r}
+str(map(keep(df, is.numeric), mean))
+```
+
+#### 9.6.3 Exercises
+
+1. Why isn’t `is.na()` a predicate function? What base R function is closest to being a predicate version of `is.na()`?
+
+```{r}
+is.na(1)
+is.na(c(1,2))
+is.na(c(NA,1,2))
+
+anyNA(1)
+anyNA(c(1,2))
+anyNA(c(1,2,NA))
+```
+
+`is.na)` is not a predicate function because it returns a T or F for each element in the vector rather than just a single T or F. The closest base R function is `anyNA()`
+
+2. `simple_reduce()` has a problem when x is length 0 or length 1. Describe the source of the problem and how you might go about fixing it.
+
+```{r}
+# Original
+simple_reduce <- function(x, f) {
+  out <- x[[1]]
+  for (i in seq(2, length(x))) {
+    out <- f(out, x[[i]])
+  }
+  out
+}
+
+simple_reduce(c(1,2,3), `+`)
+simple_reduce(c(1), `+`)
+
+new_simple_reduce <- function(x, f) {
+  if(length(x) < 2) return(x)
+  out <- x[[1]]
+  for (i in seq(2, length(x))) {
+    out <- f(out, x[[i]])
+  }
+  out
+}
+
+new_simple_reduce(c(1,2,3), `+`)
+new_simple_reduce(c(1), `+`)
+```
+
+`simple_reduce()` uses indexing which is hard coded to expect at least a length of 2. This can be fixed by checking the length of x before the for loop and assigning out.
+
+3. Implement the `span()` function from Haskell: given a list `x` and a predicate function `f`, `span(x, f)` returns the location of the longest sequential run of elements where the predicate is true. (Hint: you might find `rle()` helpful.)
+
+```{r}
+## (a -> Bool) -> [a] -> ([a], [a])
+x <- map(1:4, ~ sample(1:10, 10, replace = T))
+f <- function(l) l %% 2 == 0
+str(x)
+
+span <- function(x, f){
+  logic_vector <- map(x, ~ f(.x))
+  out <- map(logic_vector, ~rle(.x))
+  maxes <- map(out, ~max(.x[["lengths"]][.x[["values"]] == T]))
+  idx <- map2(out, maxes, ~which(.x[["lengths"]] == .y &
+                                   .x[["values"]] == T))
+  outs <- map(idx, ~rep, x = out, times = length(.x))
+  positions <- map2(out, idx, ~ sum(.x[["lengths"]][1:.y-1]) + 1)
+}
+
+
+span2 <- function(x, f){
+  logic_vector <- map(x, ~ f(.x))
+  out <- map(logic_vector, ~rle(.x))
+  maxed <- reduce(map(out, ~max(.x[["lengths"]][.x[["values"]] == T])), max)
+  
+  idx <- map2(out, maxes, ~which(.x[["lengths"]] == .y &
+                                   .x[["values"]] == T))
+  positions <- map2(out, idx, ~ sum(.x[["lengths"]][1:.y-1]) + 1)
+}
+span(x,f)
+
+```
+
