@@ -678,7 +678,7 @@ anyNA(c(1,2,NA))
 
 2. `simple_reduce()` has a problem when x is length 0 or length 1. Describe the source of the problem and how you might go about fixing it.
 
-```{r}
+```{r, error = T}
 # Original
 simple_reduce <- function(x, f) {
   out <- x[[1]]
@@ -717,24 +717,21 @@ str(x)
 span <- function(x, f){
   logic_vector <- map(x, ~ f(.x))
   out <- map(logic_vector, ~rle(.x))
-  maxes <- map(out, ~max(.x[["lengths"]][.x[["values"]] == T]))
-  idx <- map2(out, maxes, ~which(.x[["lengths"]] == .y &
+  maxes <- map(out, ~ max(.x[["lengths"]][.x[["values"]] == T]))
+  idx <- map2(out, maxes, ~ which(.x[["lengths"]] == .y &
                                    .x[["values"]] == T))
-  outs <- map(idx, ~rep, x = out, times = length(.x))
-  positions <- map2(out, idx, ~ sum(.x[["lengths"]][1:.y-1]) + 1)
-}
-
-
-span2 <- function(x, f){
-  logic_vector <- map(x, ~ f(.x))
-  out <- map(logic_vector, ~rle(.x))
-  maxed <- reduce(map(out, ~max(.x[["lengths"]][.x[["values"]] == T])), max)
-  
-  idx <- map2(out, maxes, ~which(.x[["lengths"]] == .y &
-                                   .x[["values"]] == T))
-  positions <- map2(out, idx, ~ sum(.x[["lengths"]][1:.y-1]) + 1)
+  positions <- map2(out,
+                    idx,
+                    function(x, y) {
+                      map(y, function(y2) {
+                        if (y2 == 1) {
+                          y2
+                        } else {
+                          sum(unlist(x[["lengths"]][1:(y2 - 1)])) + 1
+                        }
+                      })
+                    })
+  map(positions, unlist)
 }
 span(x,f)
-
 ```
-
