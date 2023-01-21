@@ -674,7 +674,7 @@ anyNA(c(1,2))
 anyNA(c(1,2,NA))
 ```
 
-`is.na)` is not a predicate function because it returns a T or F for each element in the vector rather than just a single T or F. The closest base R function is `anyNA()`
+`is.na())` is not a predicate function because it returns a T or F for each element in the vector rather than just a single T or F. The closest base R function is `anyNA()`
 
 2. `simple_reduce()` has a problem when x is length 0 or length 1. Describe the source of the problem and how you might go about fixing it.
 
@@ -702,6 +702,7 @@ new_simple_reduce <- function(x, f) {
 
 new_simple_reduce(c(1,2,3), `+`)
 new_simple_reduce(c(1), `+`)
+new_simple_reduce(c(), `+`)
 ```
 
 `simple_reduce()` uses indexing which is hard coded to expect at least a length of 2. This can be fixed by checking the length of x before the for loop and assigning out.
@@ -709,29 +710,197 @@ new_simple_reduce(c(1), `+`)
 3. Implement the `span()` function from Haskell: given a list `x` and a predicate function `f`, `span(x, f)` returns the location of the longest sequential run of elements where the predicate is true. (Hint: you might find `rle()` helpful.)
 
 ```{r}
-## (a -> Bool) -> [a] -> ([a], [a])
 x <- map(1:4, ~ sample(1:10, 10, replace = T))
 f <- function(l) l %% 2 == 0
 str(x)
 
-span <- function(x, f){
-  logic_vector <- map(x, ~ f(.x))
-  out <- map(logic_vector, ~rle(.x))
-  maxes <- map(out, ~ max(.x[["lengths"]][.x[["values"]] == T]))
-  idx <- map2(out, maxes, ~ which(.x[["lengths"]] == .y &
-                                   .x[["values"]] == T))
-  positions <- map2(out,
-                    idx,
-                    function(x, y) {
-                      map(y, function(y2) {
-                        if (y2 == 1) {
-                          y2
-                        } else {
-                          sum(unlist(x[["lengths"]][1:(y2 - 1)])) + 1
-                        }
+span <- function(x, f) {
+  logic_x <- map(x, f)
+  rle_x <- map(logic_x, rle)
+  rle_x <- set_names(rle_x, nm = seq_along(rle_x))
+  max_x <- map(rle_x, ~ max(.x[["lengths"]][.x[["values"]] == T]))
+  idx_x <-
+    map2(rle_x, max_x, ~ which(.x[["lengths"]] == .y &
+                                 .x[["values"]] == T))
+  positions_x <- map2(rle_x, idx_x,
+                      function(x, y) {
+                        map(y, function(y2) {
+                          if (y2 == 1) {
+                            y2
+                          } else {
+                            sum(unlist(x[["lengths"]][1:(y2 - 1)])) + 1
+                          }
+                        })
                       })
-                    })
-  map(positions, unlist)
+  positions_x <- map(positions_x, unlist)
+  return(positions_x)
 }
+
 span(x,f)
 ```
+```{r}
+span2 <- function(x, f) {
+  logic_x <- map(x, f)
+  rle_x <- map(logic_x, rle)
+  rle_x <- set_names(rle_x, nm = seq_along(rle_x))
+  maxes_x <- map(rle_x, ~ max(.x[["lengths"]][.x[["values"]] == T]))
+  max_x <- reduce(map(rle_x, ~ max(.x[["lengths"]][.x[["values"]] == T])), max)
+  max_idx <- which(maxes_x == max_x)
+  filtered_rle_x <- rle_x[max_idx]
+  idx_x <-
+    map2(filtered_rle_x, max_x, ~ which(.x[["lengths"]] == .y &
+                                 .x[["values"]] == T))
+  positions_x <- map2(filtered_rle_x, idx_x,
+                      function(x, y) {
+                        map(y, function(y2) {
+                          if (y2 == 1) {
+                            y2
+                          } else {
+                            sum(unlist(x[["lengths"]][1:(y2 - 1)])) + 1
+                          }
+                        })
+                      })
+  positions_x <- map(positions_x, unlist)
+  return(positions_x)
+}
+span2(x,f)
+```
+
+4. Implement `arg_max()`. It should take a function and a vector of inputs, and return the elements of the input where the function returns the highest value. For example, `arg_max(-10:5, function(x) x ^ 2)` should return -10. `arg_max(-5:5, function(x) x ^ 2)` should return `c(-5, 5)`. Also implement the matching arg_min() function.
+
+```{r}
+arg_max <- function(x, f){
+  values <- map_dbl(x, f)
+  x[which(values == max(values))]
+}
+
+arg_max(-10:5, function(x) x ^ 2) # -10
+arg_max(-5:5, function(x) x ^ 2) # c(-5,5)
+
+arg_min <- function(x, f){
+  values <- map_dbl(x, f)
+  x[which(values == min(values))]
+}
+
+arg_min(-10:5, function(x) x ^ 2) # 0
+arg_min(-5:5, function(x) x ^ 2) # 0
+```
+
+5. The function below scales a vector so it falls in the range [0, 1]. How would you apply it to every column of a data frame? How would you apply it to every numeric column in a data frame?
+
+```{r}
+scale01 <- function(x) {
+  rng <- range(x, na.rm = TRUE)
+  (x - rng[1]) / (rng[2] - rng[1])
+}
+numeric_iris <- iris[, 1:4]
+summary(numeric_iris)
+head(numeric_iris)
+
+#On all columns, error if not all numeric
+head(modify(numeric_iris, scale01))
+
+#On all numeric columns
+head(modify_if(iris, is.numeric, scale01))
+```
+
+## 9.7 Base functionals
+
+### 9.7.1 Matrices and arrays
+
+```{r, eval = F}
+apply(X, # the matrix or array to summarise.
+      MARGIN, # an integer vector giving the dimensions to summarise over, 1 = rows, 2 = columns
+      FUN, # a summary function
+      ... # other arguments passed on to FUN
+)
+```
+
+```{r}
+a2d <- matrix(1:20, nrow = 5)
+a2d
+apply(a2d, 1, mean)
+apply(a2d, 2, mean)
+```
+
+```{r}
+a3d <- array(1:24, c(2, 3, 4))
+a3d
+apply(a3d, 1, mean)
+apply(a3d, c(1, 2), mean)
+```
+
+
+```{r}
+a1 <- apply(a2d, 1, identity)
+identical(a2d, a1)
+
+a2 <- apply(a2d, 2, identity)
+identical(a2d, a2)
+```
+
+```{r}
+df <- data.frame(x = 1:3, y = c("a", "b", "c"))
+apply(df, 2, mean)
+```
+
+### 9.7.2 Mathematical concerns
+
+```{r}
+integrate(sin, 0, pi)
+
+str(uniroot(sin, pi * c(1 / 2, 3 / 2)))
+
+str(optimise(sin, c(0, 2 * pi)))
+
+str(optimise(sin, c(0, pi), maximum = TRUE))
+```
+### 9.7.3 Exercises
+
+1. How does `apply()` arrange the output? Read the documentation and perform some experiments.
+```{r}
+a2d <- matrix(1:20, nrow = 5)
+rownames(a2d) <- paste0("Row", 1:5)
+colnames(a2d) <- paste0("Col", 1:4)
+a2d
+apply(a2d, 1, identity)
+apply(a2d, 2, identity)
+
+# simplify on by default
+### c(n, dim(X)[MARGIN])  if n > 1
+### vector if n == 1
+
+```
+It works on the margin being operated on. In the first case it fills in across the row and there's 5 rows so it then creates 5 columns. In the second cause the margin is column so it files in by column and there are 4 columns so it fills in 4 columns.
+
+2 What do `eapply()` and `rapply()` do? Does purrr have equivalents?
+
+```{r}
+# eapply applies a function over values in an environment
+
+env <- new.env(hash = FALSE) # so the order is fixed
+env$a <- 1:10
+env$beta <- exp(-3:3)
+env$logic <- c(TRUE, FALSE, FALSE, TRUE)
+# what have we there?
+utils::ls.str(env)
+
+# compute the mean for each list element
+       eapply(env, mean)
+       
+#rapply is a to recursively apply a function to a list
+X <- list(list(a = pi, b = list(c = 1L)), d = "a test")
+
+rapply(X, function(x) x, how = "replace") -> X.; stopifnot(identical(X, X.))
+rapply(X, sqrt, classes = "numeric", how = "replace") # only operates on numeric elements
+
+X <- list(list(a = pi, b = list(c = c(1L, 2L, 3L), c2 = 2L)), d = "a test", e = c(1,2,3,4,5))
+rapply(X, sqrt, classes = "numeric", how = "replace")
+rapply(X, sqrt, classes = "numeric", how = "unlist")
+```
+
+closest is `modify_depth()`
+
+3. Challenge: read about the fixed point algorithm. Complete the exercises using R.
+
+Does not exist
