@@ -1,0 +1,262 @@
+---
+title: "10_Function_Factories"
+output: pdf_document
+date: "2023-01-31"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 10 Function factories
+## 10.1 Introduction
+```{r}
+library(tidyverse)
+```
+
+```{r}
+power1 <- function(exp) {
+  function(x) {
+    x ^ exp
+  }
+}
+
+square <- power1(2)
+cube <- power1(3)
+```
+
+```{r}
+library(rlang)
+library(ggplot2)
+library(scales)
+```
+
+## 10.2 Factory fundamentals
+
+```{r}
+square
+
+cube
+```
+
+```{r}
+env_print(square)
+
+env_print(cube)
+```
+
+```{r}
+fn_env(square)$exp
+
+fn_env(cube)$exp
+```
+
+### 10.2.2 Diagram conventions
+
+```{r}
+square(10)
+```
+
+### 10.2.3 Forcing evaluation
+```{r}
+x <- 2
+square <- power1(x)
+x <- 3
+```
+
+```{r}
+square(2)
+```
+
+```{r}
+power2 <- function(exp) {
+  force(exp)
+  function(x) {
+    x ^ exp
+  }
+}
+
+x <- 2
+square <- power2(x)
+x <- 3
+square(2)
+```
+
+### 10.2.4 Stateful functions
+
+```{r}
+new_counter <- function() {
+  i <- 0
+  
+  function() {
+    i <<- i + 1
+    i
+  }
+}
+
+counter_one <- new_counter()
+counter_two <- new_counter()
+```
+
+```{r}
+counter_one()
+
+counter_one()
+
+counter_two()
+
+counter_one()
+
+counter_two()
+```
+
+### 10.2.5 Garbage collection
+
+```{r}
+f1 <- function(n) {
+  x <- runif(n)
+  m <- mean(x)
+  function() m
+}
+
+g1 <- f1(1e6)
+lobstr::obj_size(g1)
+#> 8,013,104 B
+
+f2 <- function(n) {
+  x <- runif(n)
+  m <- mean(x)
+  rm(x)
+  function() m
+}
+
+g2 <- f2(1e6)
+lobstr::obj_size(g2)
+```
+
+#### 10.2.6 Exercises
+
+1. The definition of `force()` is simple:
+
+```{r}
+force
+```
+
+Why is it better to force(x) instead of just x?
+
+Using `force(x)` is better than `x` because it makes the evaluation of x occur immediately when the function is created rather than lazily executing the first time the function is called. If the value of `x` changes before the function is called, the value of `x` when the function was created will not be used and the new value of `x` will be used
+
+```{r}
+timeser <- function(multiplier){
+  function(x) x * multiplier
+}
+x <- 2
+doubler <- timeser(x)
+# Function called before x changed
+doubler(2)
+x <- 3
+doubler(2)
+
+x <- 2
+doubler <- timeser(x)
+# Function not called before x changed
+x <- 3
+doubler(2)
+
+# Forced operation
+timeser2 <- function(multiplier){
+  force(multiplier)
+  function(x) x * multiplier
+}
+x <- 2
+doubler <- timeser2(x)
+# Function not called before x changed
+x <- 3
+doubler(2)
+```
+
+2. Base R contains two function factories, `approxfun()` and `ecdf()`. Read their documentation and experiment to figure out what the functions do and what they return.
+
+```{r}
+x <- 1:10
+y <- rnorm(10)
+par(mfrow = c(2,1))
+plot(x, y, main = "approx(.) and approxfun(.)")
+points(approx(x, y), col = 2, pch = "*")
+points(approx(x, y, method = "constant"), col = 4, pch = "*")
+
+f <- approxfun(x, y)
+curve(f(x), 0, 11, col = "green2")
+points(x, y)
+is.function(fc <- approxfun(x, y, method = "const")) # TRUE
+curve(fc(x), 0, 10, col = "darkblue", add = TRUE)
+## different extrapolation on left and right side :
+plot(approxfun(x, y, rule = 2:1), 0, 11,
+     col = "tomato", add = TRUE, lty = 3, lwd = 2)
+```
+
+```{r}
+x <- rnorm(12)
+Fn <- ecdf(x)
+Fn     # a *function*
+Fn(x)  # returns the percentiles for x
+tt <- seq(-2, 2, by = 0.1)
+12 * Fn(tt) # Fn is a 'simple' function {with values k/12}
+summary(Fn)
+##--> see below for graphics
+knots(Fn)  # the unique data values {12 of them if there were no ties}
+
+y <- round(rnorm(12), 1); y[3] <- y[1]
+Fn12 <- ecdf(y)
+Fn12
+knots(Fn12) # unique values (always less than 12!)
+summary(Fn12)
+summary.stepfun(Fn12)
+```
+
+3. Create a function `pick()` that takes an index, `i`, as an argument and returns a function with an argument `x` that subsets `x` with `i`.
+
+```{r}
+pick <- function(index){
+  function(x) x[index]
+}
+
+a <- 1:10
+b <- LETTERS[1:10]
+pick_2s <- pick(c(2,4,8))
+pick_2s(a)
+pick_2s(b)
+```
+
+4. Create a function that creates functions that compute the $i^th$ central moment of a numeric vector. You can test it by running the following code:
+
+```{r}
+moment <- function(index){
+  function(x){
+    sum((x - mean(x)) ^ index) / length(x)
+  }
+}
+m1 <- moment(1)
+m2 <- moment(2)
+
+x <- runif(100)
+stopifnot(all.equal(m1(x), 0))
+stopifnot(all.equal(m2(x), var(x) * 99 / 100))
+```
+
+5. What happens if you don’t use a closure? Make predictions, then verify with the code below.
+```{r}
+i <- 0
+new_counter2 <- function() {
+  i <<- i + 1
+  i
+}
+
+new_counter2()
+new_counter2()
+i
+i <- 9
+new_counter2()
+i
+```
+Uses the parent environment and changes when global `i` changes in this case
