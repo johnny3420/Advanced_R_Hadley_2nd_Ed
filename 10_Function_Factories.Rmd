@@ -259,4 +259,486 @@ i <- 9
 new_counter2()
 i
 ```
-Uses the parent environment and changes when global `i` changes in this case
+Uses the parent environment and changes when global `i` changes in this case. Function factory can help prevent this
+
+```{r}
+i <- 0
+new_counter2 <- function() {
+  i <- 0
+  function(){
+    i <<- i + 1
+    i
+  }
+}
+i
+new_counter3 <- new_counter2()
+i
+new_counter3()
+new_counter3()
+i <- 0
+new_counter3()
+```
+
+6. What happens if you use `<-` instead of `<<-`? Make predictions, then verify with the code below.
+
+```{r}
+new_counter3 <- function() {
+  i <- 0
+  function() {
+    i <- i + 1
+    i
+  }
+}
+
+i # 0
+new_counter4 <- new_counter3()
+i # 0
+new_counter4() # 1
+i # 0
+new_counter4() # 1
+i # 0
+```
+
+It doesn't update `i` in the global environment so each run `i` doesn't change.
+
+## 10.3 Graphical factories
+
+### 10.3.1 Labelling
+
+```{r}
+y <- c(12345, 123456, 1234567)
+comma_format()(y)
+
+number_format(scale = 1e-3, suffix = " K")(y)
+```
+
+```{r}
+df <- data.frame(x = 1, y = y)
+core <- ggplot(df, aes(x, y)) + 
+  geom_point() + 
+  scale_x_continuous(breaks = 1, labels = NULL) +
+  labs(x = NULL, y = NULL)
+  
+core
+core + scale_y_continuous(
+  labels = comma_format()
+)
+core + scale_y_continuous(
+  labels = number_format(scale = 1e-3, suffix = " K")
+)
+core + scale_y_continuous(
+  labels = scientific_format()
+)
+```
+
+### 10.3.2 Histogram bins
+
+```{r}
+# construct some sample data with very different numbers in each cell
+sd <- c(1, 5, 15)
+n <- 100
+
+df <- data.frame(x = rnorm(3 * n, sd = sd), sd = rep(sd, n))
+
+ggplot(df, aes(x)) + 
+  geom_histogram(binwidth = 2) + 
+  facet_wrap(~ sd, scales = "free_x") + 
+  labs(x = NULL)
+```
+
+```{r}
+binwidth_bins <- function(n) {
+  force(n)
+  
+  function(x) {
+    (max(x) - min(x)) / n
+  }
+}
+
+ggplot(df, aes(x)) + 
+  geom_histogram(binwidth = binwidth_bins(20)) + 
+  facet_wrap(~ sd, scales = "free_x") + 
+  labs(x = NULL)
+```
+
+```{r}
+base_bins <- function(type) {
+  fun <- switch(type,
+    Sturges = nclass.Sturges,
+    scott = nclass.scott,
+    FD = nclass.FD,
+    stop("Unknown type", call. = FALSE)
+  )
+  
+  function(x) {
+    (max(x) - min(x)) / fun(x)
+  }
+}
+
+ggplot(df, aes(x)) + 
+  geom_histogram(binwidth = base_bins("FD")) + 
+  facet_wrap(~ sd, scales = "free_x") + 
+  labs(x = NULL)
+```
+
+### 10.3.3 `ggsave()`
+
+```{r}
+plot_dev <- function(ext, dpi = 96) {
+  force(dpi)
+  
+  switch(ext,
+    eps =  ,
+    ps  =  function(path, ...) {
+      grDevices::postscript(
+        file = filename, ..., onefile = FALSE, 
+        horizontal = FALSE, paper = "special"
+      )
+    },
+    pdf = function(filename, ...) grDevices::pdf(file = filename, ...),
+    svg = function(filename, ...) svglite::svglite(file = filename, ...),
+    emf = ,
+    wmf = function(...) grDevices::win.metafile(...),
+    png = function(...) grDevices::png(..., res = dpi, units = "in"),
+    jpg = ,
+    jpeg = function(...) grDevices::jpeg(..., res = dpi, units = "in"),
+    bmp = function(...) grDevices::bmp(..., res = dpi, units = "in"),
+    tiff = function(...) grDevices::tiff(..., res = dpi, units = "in"),
+    stop("Unknown graphics extension: ", ext, call. = FALSE)
+  )
+}
+
+plot_dev("pdf")
+
+plot_dev("png")
+```
+
+### 10.3.4 Exercises
+
+1. Compare and contrast `ggplot2::label_bquote()` with `scales::number_format()`
+
+```{r}
+y <- c(12345, 123456, 1234567)
+
+scales::number_format(scale = 1e-3, suffix = " K")(y)
+
+p <- ggplot(mtcars, aes(wt, mpg)) + geom_point()
+p + facet_grid(vs ~ ., labeller = label_bquote(alpha ^ .(vs)))
+p + facet_grid(. ~ vs, labeller = label_bquote(cols = .(vs) ^ .(vs)))
+p + facet_grid(. ~ vs + am, labeller = label_bquote(cols = .(am) ^ .(vs)))
+```
+One lets you use math notations in your labeller facet names, while the other let's you transform your number values
+
+## 10.4 Statistical factories
+
+### 10.4.1 Box-Cox transformation
+
+```{r}
+boxcox1 <- function(x, lambda) {
+  stopifnot(length(lambda) == 1)
+  
+  if (lambda == 0) {
+    log(x)
+  } else {
+    (x ^ lambda - 1) / lambda
+  }
+}
+```
+
+```{r}
+boxcox2 <- function(lambda) {
+  if (lambda == 0) {
+    function(x) log(x)
+  } else {
+    function(x) (x ^ lambda - 1) / lambda
+  }
+}
+
+stat_boxcox <- function(lambda) {
+  stat_function(aes(colour = lambda), fun = boxcox2(lambda), linewidth = 1)
+}
+
+ggplot(data.frame(x = c(0, 5)), aes(x)) + 
+  lapply(c(0.5, 1, 1.5), stat_boxcox) + 
+  scale_colour_viridis_c(limits = c(0, 1.5))
+
+ggplot(data.frame(x = c(0.01, 1)), aes(x)) + 
+  lapply(c(0.5, 0.25, 0.1, 0), stat_boxcox) + 
+  scale_colour_viridis_c(limits = c(0, 1.5))
+```
+
+### 10.4.2 Bootstrap generators
+
+```{r}
+boot_permute <- function(df, var) {
+  n <- nrow(df)
+  force(var)
+  
+  function() {
+    col <- df[[var]]
+    col[sample(n, replace = TRUE)]
+  }
+}
+
+boot_mtcars1 <- boot_permute(mtcars, "mpg")
+head(boot_mtcars1())
+
+head(boot_mtcars1())
+```
+
+```{r}
+boot_model <- function(df, formula) {
+  mod <- lm(formula, data = df)
+  fitted <- unname(fitted(mod))
+  resid <- unname(resid(mod))
+  rm(mod)
+
+  function() {
+    fitted + sample(resid)
+  }
+} 
+
+boot_mtcars2 <- boot_model(mtcars, mpg ~ wt)
+head(boot_mtcars2())
+
+head(boot_mtcars2())
+```
+
+### 10.4.3 Maximum likelihood estimation
+
+```{r}
+lprob_poisson <- function(lambda, x) {
+  n <- length(x)
+  (log(lambda) * sum(x)) - (n * lambda) - sum(lfactorial(x))
+}
+```
+
+```{r}
+x1 <- c(41, 30, 31, 38, 29, 24, 30, 29, 31, 38)
+```
+
+```{r}
+lprob_poisson(10, x1)
+#> [1] -184
+lprob_poisson(20, x1)
+#> [1] -61.1
+lprob_poisson(30, x1)
+#> [1] -31
+```
+
+```{r}
+ll_poisson1 <- function(x) {
+  n <- length(x)
+
+  function(lambda) {
+    log(lambda) * sum(x) - n * lambda - sum(lfactorial(x))
+  }
+}
+```
+
+```{r}
+ll_poisson2 <- function(x) {
+  n <- length(x)
+  sum_x <- sum(x)
+  c <- sum(lfactorial(x))
+
+  function(lambda) {
+    log(lambda) * sum_x - n * lambda - c
+  }
+}
+```
+
+```{r}
+ll1 <- ll_poisson2(x1)
+
+ll1(10)
+ll1(20)
+ll1(30)
+```
+
+```{r}
+optimise(ll1, c(0, 100), maximum = TRUE)
+```
+
+```{r}
+optimise(lprob_poisson, c(0, 100), x = x1, maximum = TRUE)
+```
+
+#### 10.4.4 Exercises
+
+1. In `boot_model()`, why don’t I need to force the evaluation of `df` or `model`?
+
+```{r}
+boot_model <- function(df, formula) {
+  mod <- lm(formula, data = df)
+  fitted <- unname(fitted(mod))
+  resid <- unname(resid(mod))
+  rm(mod)
+
+  function() {
+    fitted + sample(resid)
+  }
+} 
+```
+
+The call to `fitted` and `resid` implicitly forces the evaluation of `df` and `mod` when the factory is called and luckily these values only need to be calculated once.
+
+2. Why might you formulate the Box-Cox transformation like this?
+
+```{r}
+
+
+boxcox3 <- function(x) {
+  function(lambda) {
+    if (lambda == 0) {
+      log(x)
+    } else {
+      (x ^ lambda - 1) / lambda
+    }
+  }  
+}
+```
+
+In this case `x` is fixed when first created, but can change later on by changing `x`. You can then manipulate `lambda` and also change `x` is need be. ie change your dataset but keep the overall function the same.
+
+3. Why don’t you need to worry that `boot_permute()` stores a copy of the data inside the function that it generates?
+
+```{r}
+boot_permute <- function(df, var) {
+  n <- nrow(df)
+  force(var)
+  
+  function() {
+    col <- df[[var]]
+    col[sample(n, replace = TRUE)]
+  }
+}
+
+boot_mtcars1 <- boot_permute(mtcars, "mpg")
+head(boot_mtcars1())
+```
+
+It doesn't actually store a copy. It just describes an object already in memory. A sampling of `mtcar` where no new values are created.
+
+4. How much time does `ll_poisson2()` save compared to `ll_poisson1(`)? Use `bench::mark()` to see how much faster the optimisation occurs. How does changing the length of `x` change the results?
+
+```{r}
+ll_poisson1 <- function(x) {
+  n <- length(x)
+
+  function(lambda) {
+    log(lambda) * sum(x) - n * lambda - sum(lfactorial(x))
+  }
+}
+```
+
+```{r}
+ll_poisson1 <- function(x) {
+  n <- length(x)
+
+  function(lambda) {
+    log(lambda) * sum(x) - n * lambda - sum(lfactorial(x))
+  }
+}
+ll_poisson2 <- function(x) {
+  n <- length(x)
+  sum_x <- sum(x)
+  c <- sum(lfactorial(x))
+
+  function(lambda) {
+    log(lambda) * sum_x - n * lambda - c
+  }
+}
+x1 <- c(41, 30, 31, 38, 29, 24, 30, 29, 31, 38)
+x2 <- sample(1:1000, 100)
+x3 <- sample(1:1e6, 10000)
+
+things <- expand_grid(functional = c("ll_poisson1", "ll_poisson2"),
+                      x_values = c("x1","x2","x3"))
+
+things <- pmap(things,
+     function(functional, x_values) {
+       fun <- get(functional)
+       x <- get(x_values)
+       fun(x)
+     })
+names(things) <- c("ll11", "ll21",
+                   "ll31", "ll12",
+                   "ll22", "ll32")
+map_df(things, ~bench::mark(optimise(.x, c(0,100), maximum = TRUE))) %>%
+  mutate(input = names(things)) %>%
+  select(input, everything())
+```
+
+## 10.5 Function factories + functionals
+
+```{r}
+names <- list(
+  square = 2, 
+  cube = 3, 
+  root = 1/2, 
+  cuberoot = 1/3, 
+  reciprocal = -1
+)
+funs <- purrr::map(names, power1)
+
+funs$root(64)
+funs$root
+```
+
+```{r}
+with(funs, root(100))
+```
+
+```{r}
+attach(funs)
+
+root(100)
+
+detach(funs)
+```
+
+```{r}
+rlang::env_bind(globalenv(), !!!funs)
+root(100)
+```
+
+```{r}
+rlang::env_unbind(globalenv(), names(funs))
+```
+
+#### 10.5.1 Exercises
+
+1. Which of the following commands is equivalent to `with(x, f(z))`?
+
+E. It depends
+
+2. Compare and contrast the effects of `env_bind()` vs. `attach()` for the following code.
+
+```{r, error = T}
+funs <- list(
+  mean = function(x) mean(x, na.rm = TRUE),
+  sum = function(x) sum(x, na.rm = TRUE)
+)
+
+attach(funs)
+#> The following objects are masked from package:base:
+#> 
+#>     mean, sum
+mean <- function(x) stop("Hi!")
+detach(funs)
+
+mean(1:5)
+sum(1:5)
+
+rlang::env_bind(globalenv(), !!!funs)
+mean(1:5)
+sum(1:5)
+mean <- function(x) stop("Hi!") 
+mean(1:5)
+rlang::env_unbind(globalenv(), names(funs))
+mean(1:5)
+sum(1:5)
+```
+
+with `attach` the base `mean` and `sum` functions are masked because you are adding `funs` to the search path. Detaching `funs` removes the masking and `funs` from the search path. However if you change `mean` you change the base `mean` function as well. With `env_bind` you can change the functions in the global environment, but then when you unbind them they revert back to their original format.
