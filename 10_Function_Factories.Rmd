@@ -716,12 +716,15 @@ E. It depends
 2. Compare and contrast the effects of `env_bind()` vs. `attach()` for the following code.
 
 ```{r, error = T}
+mean(1:5)
 funs <- list(
   mean = function(x) mean(x, na.rm = TRUE),
   sum = function(x) sum(x, na.rm = TRUE)
 )
 
 attach(funs)
+
+mean(1:5)
 #> The following objects are masked from package:base:
 #> 
 #>     mean, sum

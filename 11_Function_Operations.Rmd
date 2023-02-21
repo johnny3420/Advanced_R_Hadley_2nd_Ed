@@ -1,0 +1,388 @@
+---
+title: "11_Function_Operations"
+output: pdf_document
+date: "2023-02-21"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 11 Function operators
+## 11.1 Introduction
+
+```{r}
+chatty <- function(f) {
+  force(f)
+  
+  function(x, ...) {
+    res <- f(x, ...)
+    cat("Processing ", x, "\n", sep = "")
+    res
+  }
+}
+f <- function(x) x ^ 2
+s <- c(3, 2, 1)
+
+purrr::map_dbl(s, chatty(f))
+```
+
+```{r}
+library(purrr)
+library(memoise)
+```
+
+## 11.2 Existing function operators
+
+### 11.2.1 Capturing errors with purrr::safely()
+
+```{r, error = T}
+x <- list(
+  c(0.512, 0.165, 0.717),
+  c(0.064, 0.781, 0.427),
+  c(0.890, 0.785, 0.495),
+  "oops"
+)
+
+out <- rep(NA_real_, length(x))
+for (i in seq_along(x)) {
+  out[[i]] <- sum(x[[i]])
+}
+
+out
+```
+
+```{r, error = T}
+map_dbl(x, sum)
+```
+
+```{r}
+safe_sum <- safely(sum)
+safe_sum
+```
+
+```{r}
+str(safe_sum(x[[1]]))
+```
+
+```{r}
+str(safe_sum(x[[4]]))
+```
+
+```{r}
+out <- map(x, safely(sum))
+str(out)
+```
+
+```{r}
+out <- transpose(map(x, safely(sum)))
+str(out)
+```
+
+```{r}
+ok <- map_lgl(out$error, is.null)
+ok
+```
+
+```{r}
+x[!ok]
+```
+
+```{r}
+out$result[ok]
+```
+
+```{r}
+fit_model <- function(df) {
+  glm(Petal.Length ~ Petal.Width + Sepal.Length * Sepal.Width, data = df)
+}
+
+datasets <- list(iris, PlantGrowth, attitude)
+
+models <- transpose(map(datasets, safely(fit_model)))
+ok <- map_lgl(models$error, is.null)
+
+# which data failed to converge?
+datasets[!ok]
+
+# which models were successful?
+models[ok]
+```
+
+### 11.2.2 Caching computations with memoise::memoise()
+
+```{r}
+slow_function <- function(x) {
+  Sys.sleep(1)
+  x * 10 * runif(1)
+}
+system.time(print(slow_function(1)))
+
+system.time(print(slow_function(1)))
+```
+
+```{r}
+fast_function <- memoise::memoise(slow_function)
+system.time(print(fast_function(1)))
+
+system.time(print(fast_function(1)))
+```
+
+```{r}
+fib <- function(n) {
+  if (n < 2) return(1)
+  fib(n - 2) + fib(n - 1)
+}
+system.time(fib(23))
+
+system.time(fib(24))
+```
+
+```{r}
+fib2 <- memoise::memoise(function(n) {
+  if (n < 2) return(1)
+  fib2(n - 2) + fib2(n - 1)
+})
+system.time(fib2(23))
+system.time(fib2(24))
+```
+
+#### 11.2.3 Exercises
+
+1. Base R provides a function operator in the form of `Vectorize()`. What does it do? When might you use it?
+
+```{r}
+f <- function(x = 1:3, y) c(x, y)
+vf <- Vectorize(f, SIMPLIFY = FALSE)
+f(1:3, 1:3)
+vf(1:3, 1:3)
+vf(y = 1:3)
+```
+
+`Vectorize` creates a function wrapper that vectorizes the action of its argument `FUN`. I probably won't use it unless I see a better example
+
+2. Read the source code for `possibly()`. How does it work?
+
+```{r}
+x <- list(
+  c(0.512, 0.165, 0.717),
+  c(0.064, 0.781, 0.427),
+  c(0.890, 0.785, 0.495),
+  "oops"
+)
+possibly_sum <- possibly(sum, otherwise = "You Dumb")
+out <- map(x, possibly_sum)
+str(out)
+```
+
+Create a modified version of `.f` that return a default value (`otherwise`) whenever an error occurs.
+
+3. Read the source code for `safely()`. How does it work?
+
+```{r}
+safely_sum <- safely(sum)
+out <- map(x, safely_sum)
+str(out)
+```
+
+Creates a modified version of .f that always succeeds. It returns a list with components result and error. If the function succeeds, result contains the returned value and error is NULL. If an error occurred, error is an error object and result is either NULL or otherwise.
+
+## 11.3 Case study: Creating your own function operators
+
+```{r}
+urls <- c(
+  "adv-r" = "https://adv-r.hadley.nz", 
+  "r4ds" = "http://r4ds.had.co.nz/"
+  # and many many more
+)
+path <- paste(tempdir(), names(urls), ".html")
+
+walk2(urls, path, download.file, quiet = TRUE)
+```
+
+```{r}
+paths <- path
+for(i in seq_along(urls)) {
+  Sys.sleep(0.1)
+  if (i %% 10 == 0) cat(".")
+  download.file(urls[[i]], paths[[i]])
+}
+```
+
+```{r}
+delay_by <- function(f, amount) {
+  force(f)
+  force(amount)
+  
+  function(...) {
+    Sys.sleep(amount)
+    f(...)
+  }
+}
+system.time(runif(100))
+
+system.time(delay_by(runif, 0.1)(100))
+```
+
+```{r}
+walk2(urls, path, delay_by(download.file, 0.1), quiet = TRUE)
+```
+
+```{r}
+dot_every <- function(f, n) {
+  force(f)
+  force(n)
+  
+  i <- 0
+  function(...) {
+    i <<- i + 1
+    if (i %% n == 0) cat(".")
+    f(...)
+  }
+}
+walk(1:100, runif)
+walk(1:100, dot_every(runif, 10))
+```
+
+```{r}
+walk2(
+  urls, path, 
+  dot_every(delay_by(download.file, 0.1), 10), 
+  quiet = TRUE
+)
+```
+
+```{r}
+walk2(
+  urls,
+  path, 
+  download.file %>% dot_every(10) %>% delay_by(0.1), 
+  quiet = TRUE
+)
+```
+
+#### 11.3.1 Exercises
+
+1. Weigh the pros and cons of `download.file %>% dot_every(10) %>% delay_by(0.1)` versus `download.file %>% delay_by(0.1) %>% dot_every(10)`.
+
+```{r}
+walk2(
+  urls,
+  path, 
+  download.file %>% dot_every(10) %>% delay_by(0.1), 
+  quiet = TRUE
+)
+
+walk2(
+  urls,
+  path, 
+  download.file %>% delay_by(0.1) %>% dot_every(10), 
+  quiet = TRUE
+)
+```
+
+Dot when the 10th download starts vs dot when the 9th download finishs
+
+
+2. Should you memoise `file.download()`? Why or why not?
+
+I wouldn't. Why store large files in memory. If the file changes you'd messed up your analysis
+
+3. Create a function operator that reports whenever a file is created or deleted in the working directory, using `dir()` and `setdiff()`. What other global function effects might you want to track?
+
+```{r}
+dir_checker <- function(past, present){
+  added <- setdiff(present,past)
+  removed <- setdiff(past,present)
+  if(length(added == 0 & removed == 0)){
+    return()
+  }
+  if(length(added) > 0) cat(paste(added, "was added\n"))
+  if(length(removed) > 0) cat(paste(removed, "was removed\n"))
+}
+
+dir_tracker <- function(f){
+  function(...){
+    on.exit(dir_checker(past, dir()), add = T)
+    past <- dir()
+    f(...)
+  }
+}
+
+#Download Hadley Books
+urls <- c(
+  "adv-r" = "https://adv-r.hadley.nz", 
+  "r4ds" = "http://r4ds.had.co.nz/"
+  # and many many more
+)
+paths <- paste0(names(urls), ".html")
+
+book_get <- function(urls, paths){
+  walk2(urls, paths, download.file, quiet = TRUE)
+}
+
+book_remove <- function(paths){
+  walk(paths, file.remove)
+}
+
+# Get books
+get_books <- dir_tracker(book_get)
+get_books(urls,paths)
+
+# Remove books
+remove_books <- dir_tracker(book_remove)
+remove_books(paths)
+```
+
+Know when the working directory changes. When functions are masked by other functions. If default plotting arguments have been changed.
+
+4. Write a function operator that logs a timestamp and message to a file every time a function is run.
+
+```{r}
+function_tracker <- function(f, log.file){
+  if(file.exists(log.file)) file.remove(log.file)
+  i <- 0
+  function(...){
+    i <<- i + 1
+    cat(paste0("Function has been run ", i, " time(s) as of ", date(), "\n"), file = log.file, append = T)
+    f(...)
+  }
+}
+
+new_mean <- function_tracker(mean, "mean.log")
+
+new_mean(x[[1]])
+readLines("mean.log")
+
+new_mean(x[[2]])
+new_mean(x[[3]])
+readLines("mean.log")
+```
+
+5. Modify `delay_by()` so that instead of delaying by a fixed amount of time, it ensures that a certain amount of time has elapsed since the function was last called. That is, if you called `g <- delay_by(1, f); g(); Sys.sleep(2); g()` there shouldn’t be an extra delay.
+
+```{r}
+delay_by <- function(f, amount) {
+  force(f)
+  force(amount)
+  timer <- NULL
+  function(...) {
+    if (!is.null(timer)) {
+      if (Sys.time() - timer < amount) {
+        Sys.sleep(amount - (Sys.time() - timer))
+      }
+    }
+    on.exit(timer <<- Sys.time())
+    f(...)
+  }
+}
+
+timed_random <- delay_by(runif, 5)
+Sys.time()
+system.time(timed_random(10))
+system.time(timed_random(10))
+Sys.sleep(11)
+system.time(timed_random(10))
+
+```
+
