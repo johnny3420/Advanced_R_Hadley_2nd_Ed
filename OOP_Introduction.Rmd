@@ -1,0 +1,36 @@
+---
+title: "OOP_Introduction"
+output: pdf_document
+date: "2023-02-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+## OOP systems
+
+```{r}
+diamonds <- ggplot2::diamonds
+
+summary(diamonds$carat)
+
+summary(diamonds$cut)
+```
+
+## OOP in R
+
+```{r}
+library(sloop)
+```
+
+```{r}
+otype(1:10)
+
+otype(mtcars)
+
+mle_obj <- stats4::mle(function(x = 1) (x - 2) ^ 2)
+otype(mle_obj)
+```
+

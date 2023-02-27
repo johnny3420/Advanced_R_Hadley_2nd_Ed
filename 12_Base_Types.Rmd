@@ -1,0 +1,85 @@
+---
+title: "12_Base_Types"
+output: pdf_document
+date: "2023-02-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# 12 Base types
+## 12.1 Introduction
+## 12.2 Base versus OO objects
+
+```{r}
+# A base object:
+is.object(1:10)
+sloop::otype(1:10)
+
+# An OO object
+is.object(mtcars)
+sloop::otype(mtcars)
+#> [1] "S3"
+```
+
+```{r}
+attr(1:10, "class")
+
+attr(mtcars, "class")
+```
+
+```{r}
+x <- matrix(1:4, nrow = 2)
+class(x)
+sloop::s3_class(x)
+```
+
+## 12.3 Base types
+
+```{r}
+typeof(1:10)
+
+typeof(mtcars)
+```
+
+```{r}
+typeof(NULL)
+typeof(1L)
+typeof(1i)
+```
+
+```{r}
+typeof(mean)
+typeof(`[`)
+typeof(sum)    
+```
+
+```{r}
+typeof(globalenv())
+```
+
+```{r}
+mle_obj <- stats4::mle(function(x = 1) (x - 2) ^ 2)
+typeof(mle_obj)
+```
+
+```{r}
+typeof(quote(a))
+typeof(quote(a + 1))
+typeof(formals(mean))
+```
+
+### 12.3.1 Numeric type
+
+```{r}
+sloop::s3_class(1)
+sloop::s3_class(1L)
+```
+
+```{r}
+typeof(factor("x"))
+is.numeric(factor("x"))
+```
+
