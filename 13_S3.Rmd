@@ -1,0 +1,421 @@
+---
+title: "13_S3"
+output: pdf_document
+date: "2023-03-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 13 S3
+## 13.1 Introduction
+
+```{r}
+library(sloop)
+```
+
+## 13.2 Basics
+
+```{r}
+f <- factor(c("a", "b", "c"))
+
+typeof(f)
+
+attributes(f)
+```
+
+```{r}
+unclass(f)
+```
+
+```{r}
+ftype(print)
+
+ftype(str)
+
+ftype(unclass)
+```
+
+```{r}
+print(f)
+```
+
+```{r}
+print(unclass(f))
+```
+
+```{r}
+time <- strptime(c("2017-01-01", "2020-05-04 03:21"), "%Y-%m-%d")
+str(time)
+
+str(unclass(time))
+```
+
+```{r}
+s3_dispatch(print(f))
+```
+
+```{r}
+ftype(t.test)
+ftype(t.data.frame)
+```
+
+```{r, error = T}
+weighted.mean.Date
+
+s3_get_method(weighted.mean.Date)
+```
+
+When using `s3_dispatch()`
+
+`=>` method exists and is found by `UseMethod()`.
+
+`->` method exists and is used by `NextMethod()`.
+
+`*` method exists but is not used.
+
+Nothing (and greyed out in console): method does not exist.
+
+
+### 13.2.1 Exercises
+
+1. Describe the difference between `t.test()` and `t.data.frame()`. When is each function called?
+
+```{r}
+ftype(t.test)
+s3_dispatch(t.test(1:10, y = c(7:20)))
+
+ftype(t.data.frame)
+
+s3_dispatch(t(data.frame(a=1:5, b = 6:10)))
+
+s3_dispatch(t.data.frame(data.frame(a=1:5, b = 6:10)))
+```
+
+t.test is a generic while t.data.frame is a method. t.test gets called first since it is a generic and then it finds the right implementation for the job. t.data.frame is called once the generic determines it is the correct method by performing method dispatch.
+
+2. Make a list of commonly used base R functions that contain `.` in their name but are not S3 methods.
+
+```{r}
+ftype(read.csv)
+ftype(as.character)
+ftype(all.equal)
+ftype(file.copy)
+ftype(format.info)
+ftype(is.na)
+ftype(Sys.info)
+```
+
+
+3. What does the `as.data.frame.data.frame()` method do? Why is it confusing? How could you avoid this confusion in your own code?
+
+```{r, error = T}
+ftype(as.data.frame.data.frame)
+
+s3_dispatch(as.data.frame.data.frame(mtcars))
+as.data.frame.data.frame(mtcars)
+
+s3_dispatch(as.data.frame.data.frame(matrix(1:25, nrow = 5)))
+as.data.frame.data.frame(matrix(1:25, nrow = 5))
+
+s3_dispatch(as.data.frame(matrix(1:25, nrow = 5)))
+as.data.frame(matrix(1:25, nrow = 5))
+```
+
+It checks if the object is a `data.frame` and coerces it if possible and then attempts to cast it as a `data.frame` Easier to just use the generic instead of the specific method, let method dispatch do the work for you
+
+4. Describe the difference in behaviour in these two calls.
+
+```{r}
+set.seed(1014)
+some_days <- as.Date("2017-01-31") + sample(10, 5)
+
+some_days
+
+s3_dispatch(mean(some_days))
+class(some_days)
+mean(some_days)
+
+s3_dispatch(mean(unclass(some_days)))
+class(unclass(some_days))
+str(unclass(some_days))
+mean(unclass(some_days))
+```
+
+The first one calculates mean using the `mean.Date` method since it sees the class is "Date". In the second class is stripped so it becomes a numeric and this causes the `mean.default` method to be used.
+
+5. What class of object does the following code return? What base type is it built on? What attributes does it use?
+
+```{r}
+x <- ecdf(rpois(100, 10))
+x
+class(x)
+str(x)
+typeof(unclass(x))
+```
+
+`x` is class ecdf, with two more classes of stepfun and function. it's base class is a closure (function). The attribute it uses is the expression used when it was created `rpois(100,10)`.
+
+6. What class of object does the following code return? What base type is it built on? What attributes does it use?
+
+```{r}
+x <- table(rpois(100, 5))
+x
+class(x)
+typeof(x)
+str(x)
+attributes(x)
+class(unclass(x))
+```
+
+Class is `table`. It is built on top of the base type `integer`. It uses the attribute `dimnames`
+
+## 13.3 Classes
+
+```{r}
+# Create and assign class in one step
+x <- structure(list(), class = "my_class")
+
+# Create, then set class
+x <- list()
+class(x) <- "my_class"
+```
+
+```{r}
+class(x)
+
+inherits(x, "my_class")
+
+inherits(x, "your_class")
+```
+
+```{r, error = T}
+# Create a linear model
+mod <- lm(log(mpg) ~ log(disp), data = mtcars)
+class(mod)
+
+print(mod)
+
+# Turn it into a date (?!)
+class(mod) <- "Date"
+
+# Unsurprisingly this doesn't work very well
+print(mod)
+```
+
+### 13.3.1 Constructors
+
+```{r}
+new_Date <- function(x = double()) {
+  stopifnot(is.double(x))
+  structure(x, class = "Date")
+}
+
+new_Date(c(-1, 0, 1))
+```
+
+```{r}
+new_difftime <- function(x = double(), units = "secs") {
+  stopifnot(is.double(x))
+  units <- match.arg(units, c("secs", "mins", "hours", "days", "weeks"))
+
+  structure(x,
+    class = "difftime",
+    units = units
+  )
+}
+
+new_difftime(c(1, 10, 3600), "secs")
+
+new_difftime(52, "weeks")
+```
+
+### 13.3.2 Validators
+
+```{r, error = T}
+new_factor <- function(x = integer(), levels = character()) {
+  stopifnot(is.integer(x))
+  stopifnot(is.character(levels))
+
+  structure(
+    x,
+    levels = levels,
+    class = "factor"
+  )
+}
+
+new_factor(1:5, "a")
+
+new_factor(0:1, "a")
+```
+
+```{r,  error=T}
+validate_factor <- function(x) {
+  values <- unclass(x)
+  levels <- attr(x, "levels")
+
+  if (!all(!is.na(values) & values > 0)) {
+    stop(
+      "All `x` values must be non-missing and greater than zero",
+      call. = FALSE
+    )
+  }
+
+  if (length(levels) < max(values)) {
+    stop(
+      "There must be at least as many `levels` as possible values in `x`",
+      call. = FALSE
+    )
+  }
+
+  x
+}
+
+validate_factor(new_factor(1:5, "a"))
+
+validate_factor(new_factor(0:1, "a"))
+```
+
+### 13.3.3 Helpers
+
+```{r, error = T}
+new_difftime(1:10)
+```
+
+```{r}
+difftime <- function(x = double(), units = "secs") {
+  x <- as.double(x)
+  new_difftime(x, units = units)
+}
+
+difftime(1:10)
+```
+
+```{r}
+factor <- function(x = character(), levels = unique(x)) {
+  ind <- match(x, levels)
+  validate_factor(new_factor(ind, levels))
+}
+
+factor(c("a", "a", "b"))
+```
+
+```{r}
+POSIXct <- function(year = integer(), 
+                    month = integer(), 
+                    day = integer(), 
+                    hour = 0L, 
+                    minute = 0L, 
+                    sec = 0, 
+                    tzone = "") {
+  ISOdatetime(year, month, day, hour, minute, sec, tz = tzone)
+}
+
+POSIXct(2020, 1, 1, tzone = "America/New_York")
+```
+
+### 13.3.4 Exercises
+
+1. Write a constructor for `data.frame` objects. What base type is a data frame built on? What attributes does it use? What are the restrictions placed on the individual elements? What about the names?
+
+```{r, error = T}
+str(mtcars)
+class(mtcars)
+unclass(mtcars)
+str(unclass(mtcars))
+new_data.frame <- function(x, row.names = NULL){ # x is the input list
+  stopifnot(is.list(x)) # Require list
+  stopifnot(length(unique(lengths(x))) == 1) # Require same length vectors
+  n <- unique(lengths(x))
+  if(is.null(row.names)){
+    row.names <- as.character(1:n)
+  } else {
+    stopifnot(is.character(row.names), length(row.names) == n)
+  }
+  structure(
+    x,
+    class = "data.frame",
+    row.names = row.names
+  )
+}
+
+dat_list <- list(a = 1:5, b = 6:10)
+new_data.frame(dat_list)
+new_data.frame(dat_list, row.names = LETTERS[1:5])
+
+dat_list2 <- list(a = 1:5, b = 6:11)
+new_data.frame(dat_list2)
+```
+
+data.frames are built on top of lists. The list contains named vectors and a row.names attribute which is optional. Each name in row.names has to be unique and each element of the list must be the same length
+
+2. Enhance my `factor()` helper to have better behaviour when one or more values is not found in levels. What does `base::factor()` do in this situation?
+
+```{r}
+factor <- function(x = character(), levels = unique(x)) {
+  ind <- match(x, levels)
+  if(any(is.na(ind))){
+    cat("removing", x[is.na(ind)], "since they are not present in levels\n")
+    x <- x[!is.na(ind)]
+    ind <- match(x, levels)
+  }
+  validate_factor(new_factor(ind, levels))
+}
+
+x <- c("a", "a", "b")
+factor(x)
+
+factor(x = x,
+       levels = c("a", "c"))
+
+base::factor(x = x,
+       levels = c("a", "c"))
+```
+
+In this case `base::factor` will convert values not present in level to `NA`
+
+
+3. Carefully read the source code of `factor()`. What does it do that my constructor does not?
+
+If any of the indexes are not an integer it stops the execution. This means an `NA`s from `ind` in the helper function will cause the function to stop. In the base function if levels are not provided, it generates levels from input. The base function handles cases of input where the input has levels not listed in the levels. It creates the vector, converts non-level values to `NA` and then adds the levels attribute. 
+
+4. Factors have an optional “contrasts” attribute. Read the help for `C()`, and briefly describe the purpose of the attribute. What type should it have? Rewrite the `new_factor()` constructor to include this attribute.
+
+```{r}
+new_factor <- function(x = integer(), levels = character(), contrasts = NULL) {
+  stopifnot(is.integer(x))
+  stopifnot(is.character(levels))
+  if(!is.null(contrasts)){
+    stopifnot(is.matrix(contrasts) && is.numeric(contrasts))
+  }
+
+  structure(
+    x,
+    levels = levels,
+    class = "factor",
+    contrasts = contrasts
+  )
+}
+
+model3 <- glm(cbind(ncases, ncontrols) ~ agegp + C(tobgp, , 1) +
+     C(alcgp, , 1), data = esoph, family = binomial())
+summary(model3)
+```
+
+C needs a mumeric matrix or a suitable function. When modeling it allows us to preset the contrasts we want to use.
+
+
+5. Read the documentation for `utils::as.roman()`. How would you write a constructor for this class? Does it need a validator? What might a helper do?
+
+It converts integer numbers into roman numerals. The new object is has the class "roman" Number range is 1 to 3899. It uses a basic dictionary called `.romans`. Constructor makes sure we have in integer input. Validator can check to make sure it's in range. Helper could round numbers to the nearest integer
+
+```{r}
+.romans
+a <- as.roman(13)
+a
+typeof(a)
+str(a)
+attributes(a)
+```
+
