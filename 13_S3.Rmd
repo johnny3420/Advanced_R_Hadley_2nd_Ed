@@ -543,6 +543,26 @@ g(x)
 g.default(x)
 ```
 
+```{r}
+g <- function(x) {
+  x <- 10
+  y <- 10
+  UseMethod("g")
+}
+
+g.factor <- function(x) cat("FACTOR\n")
+g.integer <- function(x) cat("INTEGER\n")
+g.default <- function(x) cat("NOT THOSE\n")
+x <- factor("A")
+x2 <- 1L
+
+g(x)
+g(x2)
+g(list())
+g(c())
+```
+
+
 The function uses the value of x we provide and not the value set in the generic. Method dispatch takes place based on the class(es) of the first argument to the generic function or of the object supplied as an argument to UseMethod or NextMethod.
 
 6. What are the arguments to `[`? Why is this a hard question to answer?
