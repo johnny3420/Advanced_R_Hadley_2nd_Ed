@@ -487,9 +487,13 @@ x
 
 class(x)
 
+s3_dispatch(t(x))
+s3_dispatch(t(matrix(1:25, ncol = 5)))
+x <- matrix(1:25, ncol = 5)
 t(x)
 
-x <- matrix(1:25, ncol = 5)
+t.test <- function(x) cat("FOUND IT\n")
+s3_dispatch(t(structure(matrix(1:25, ncol = 5), class = "test")))
 t(x)
 ```
 
