@@ -669,3 +669,295 @@ map_chr(mod, typeof)
 
 
 You would need to ensure each piece of lm object is included and is the right type as listed above.
+
+## 13.6 Inheritance
+
+```{r}
+class(ordered("x"))
+class(Sys.time())
+```
+
+```{r}
+s3_dispatch(print(ordered("x")))
+s3_dispatch(print(Sys.time()))
+```
+
+```{r}
+s3_dispatch(ordered("x")[1])
+s3_dispatch(Sys.time()[1])
+```
+
+
+### 13.6.1 `NextMethod()`
+```{r}
+new_secret <- function(x = double()) {
+  stopifnot(is.double(x))
+  structure(x, class = "secret")
+}
+
+print.secret <- function(x, ...) {
+  print(strrep("x", nchar(x)))
+  invisible(x)
+}
+
+x <- new_secret(c(15, 1, 456))
+x
+```
+
+```{r}
+s3_dispatch(x[1])
+x[1]
+class(x[1])
+```
+
+```{r, eval = F}
+`[.secret` <- function(x, i) {
+  new_secret(x[i])
+}
+```
+
+```{r}
+`[.secret` <- function(x, i) {
+  x <- unclass(x)
+  new_secret(x[i])
+}
+x[1]
+```
+
+```{r}
+`[.secret` <- function(x, i) {
+  new_secret(NextMethod())
+}
+x[1]
+```
+
+```{r}
+s3_dispatch(x[1])
+```
+
+### 13.6.2 Allowing subclassing
+
+```{r}
+new_secret <- function(x, ..., class = character()) {
+  stopifnot(is.double(x))
+
+  structure(
+    x,
+    ...,
+    class = c(class, "secret")
+  )
+}
+```
+
+```{r}
+new_supersecret <- function(x) {
+  new_secret(x, class = "supersecret")
+}
+
+print.supersecret <- function(x, ...) {
+  print(rep("xxxxx", length(x)))
+  invisible(x)
+}
+
+x2 <- new_supersecret(c(15, 1, 456))
+x2
+
+class(x2)
+```
+
+```{r}
+`[.secret` <- function(x, ...) {
+  new_secret(NextMethod())
+}
+
+x2[1:3]
+class(x2[1:3])
+```
+
+```{r}
+vec_restore.secret <- function(x, to, ...) new_secret(x)
+vec_restore.supersecret <- function(x, to, ...) new_supersecret(x)
+```
+
+```{r}
+`[.secret` <- function(x, ...) {
+  vctrs::vec_restore(NextMethod(), x)
+}
+x2[1:3]
+class(x2[1:3])
+```
+
+### 13.6.3 Exercises
+
+1. How does `[.Date` support subclasses? How does it fail to support subclasses?
+
+```{r}
+x <- Sys.time()
+x
+class(x)
+attributes(x)
+x[1]
+x[1:15]
+class(x[1])
+attributes(x[1])
+
+x <- structure(2,
+               extras = "AAAAAAAAAA",
+               class = c("Junk", "Date"))
+
+attributes(x)
+attributes(x[1])
+
+
+x <- structure("BADD_ATE",
+               extras = "AAAAAAAAAA",
+               class = c("Junk", "Date"))
+
+attributes(x)
+attributes(x[1])
+```
+
+It keeps the class, but loses the attributes
+
+2. R has two classes for representing date time data, `POSIXct` and `POSIXlt`, which both inherit from POSIXt. Which generics have different behaviours for the two classes? Which generics share the same behaviour?
+
+```{r}
+subclass_specific <- union(s3_methods_class("POSIXct")$generic, s3_methods_class("POSIXlt")$generic)
+subclass_specific
+
+shared_subclass <- setdiff(s3_methods_class("POSIXt")$generic, subclass_specific)
+shared_subclass
+```
+
+
+3. What do you expect this code to return? What does it actually return? Why?
+
+```{r}
+generic2 <- function(x) UseMethod("generic2")
+generic2.a1 <- function(x) "a1"
+generic2.a2 <- function(x) "a2"
+generic2.b <- function(x) {
+  class(x) <- "a1"
+  NextMethod()
+}
+
+generic2(structure(list(), class = c("b", "a2")))
+
+s3_dispatch(generic2(structure(list(), class = c("b", "a2"))))
+
+str(generic2(structure(list(), class = c("b", "a2"))))
+```
+
+assume it prints out "a1", but got "a2". `NextMethod()` ignores that we changed the class. Note that `.Class` is set when the generic is called, and is unchanged if the class of the dispatching argument is changed in a method. It is possible to change the method that `NextMethod` would dispatch by manipulating `.Class`, but ‘this is not recommended unless you understand the inheritance mechanism thoroughly’ (Chambers & Hastie, 1992, p. 469).
+
+## 13.7 Dispatch details
+
+### 13.7.1 S3 and base types
+
+```{r}
+class(matrix(1:5))
+```
+
+```{r}
+s3_class(matrix(1:5))
+```
+
+```{r}
+s3_dispatch(print(matrix(1:5)))
+```
+
+```{r}
+x1 <- 1:5
+class(x1)
+str(x1)
+s3_dispatch(mean(x1))
+```
+
+```{r}
+x2 <- structure(x1, class = "integer")
+class(x2)
+str(x2)
+s3_dispatch(mean(x2))
+```
+
+### 13.7.2 Internal generics
+
+```{r}
+s3_dispatch(Sys.time()[1])
+```
+
+### 13.7.3 Group generics
+
+There are four group generics:
+
+**Math**: abs(), sign(), sqrt(), floor(), cos(), sin(), log(), and more (see ?Math for the complete list).
+
+**Ops**: +, -, *, /, ^, %%, %/%, &, |, !, ==, !=, <, <=, >=, and >.
+
+**Summary**: all(), any(), sum(), prod(), min(), max(), and range().
+
+**Complex**: Arg(), Conj(), Im(), Mod(), Re().
+
+
+```{r}
+s3_dispatch(sum(Sys.time()))
+```
+
+```{r}
+y <- as.difftime(10, units = "mins")
+s3_dispatch(abs(y))
+```
+
+```{r, eval = F}
+Math.difftime <- function(x, ...) {
+  new_difftime(NextMethod(), units = attr(x, "units"))
+}
+```
+
+### 13.7.4 Double dispatch
+
+```{r}
+date <- as.Date("2017-01-01")
+integer <- 1L
+
+date + integer
+integer + date
+```
+
+### 13.7.5 Exercises
+
+1. Explain the differences in dispatch below:
+
+```{r}
+length.integer <- function(x) 10
+
+x1 <- 1:5
+class(x1)
+
+s3_dispatch(length(x1))
+
+
+x2 <- structure(x1, class = "integer")
+class(x2)
+
+s3_dispatch(length(x2))
+```
+
+`length` has an internal it uses in the first case since class wasn't defined. In the second case class was defined so it does the dispatch to find the method to use
+
+2. What classes have a method for the `Math` group generic in base R? Read the source code. How do the methods work?
+
+```{r}
+methods("Math")
+s3_methods_generic("Math")
+```
+
+Members of this group dispatch on x. Most members accept only one argument, but members log, round and signif accept one or two arguments, and trunc accepts one or more.
+
+3. `Math.difftime()` is more complicated than I described. Why?
+
+```{r}
+Math.difftime
+```
+
+It has a filtering step
