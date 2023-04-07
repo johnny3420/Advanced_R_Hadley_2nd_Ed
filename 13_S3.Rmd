@@ -791,7 +791,7 @@ class(x2[1:3])
 
 1. How does `[.Date` support subclasses? How does it fail to support subclasses?
 
-```{r}
+```{r, error = T}
 x <- Sys.time()
 x
 class(x)
@@ -804,15 +804,16 @@ attributes(x[1])
 x <- structure(2,
                extras = "AAAAAAAAAA",
                class = c("Junk", "Date"))
-
+print(x)
 attributes(x)
 attributes(x[1])
-
+print(x[1])
 
 x <- structure("BADD_ATE",
                extras = "AAAAAAAAAA",
                class = c("Junk", "Date"))
-
+print(x[1])
+x[1]
 attributes(x)
 attributes(x[1])
 ```
@@ -824,6 +825,12 @@ It keeps the class, but loses the attributes
 ```{r}
 subclass_specific <- union(s3_methods_class("POSIXct")$generic, s3_methods_class("POSIXlt")$generic)
 subclass_specific
+
+a <- c("A","B","C")
+b <- c("B", "C", "D")
+
+union(a,b)
+intersect(a,b)
 
 shared_subclass <- setdiff(s3_methods_class("POSIXt")$generic, subclass_specific)
 shared_subclass
@@ -842,9 +849,17 @@ generic2.b <- function(x) {
 }
 
 generic2(structure(list(), class = c("b", "a2")))
-
 s3_dispatch(generic2(structure(list(), class = c("b", "a2"))))
+str(generic2(structure(list(), class = c("b", "a2"))))
 
+generic2.b <- function(x) {
+  .Class <- "a1"
+  class(x) <- "a1"
+  NextMethod()
+}
+
+generic2(structure(list(), class = c("b", "a2")))
+s3_dispatch(generic2(structure(list(), class = c("b", "a2"))))
 str(generic2(structure(list(), class = c("b", "a2"))))
 ```
 
