@@ -10,7 +10,7 @@
 
 
 
-<meta name="date" content="2023-04-01" />
+<meta name="date" content="2023-04-10" />
 
 <title>14_R6</title>
 
@@ -350,7 +350,7 @@ display: none;
 
 
 <h1 class="title toc-ignore">14_R6</h1>
-<h4 class="date">2023-04-01</h4>
+<h4 class="date">2023-04-10</h4>
 
 </div>
 
@@ -639,16 +639,16 @@ Deck &lt;- R6Class(
 
 MyDeck &lt;- Deck$new()
 MyDeck$draw(52)</code></pre>
-<pre><code>##  [1] &quot;9♣&quot;  &quot;Q♣&quot;  &quot;Q♦&quot;  &quot;8♥&quot;  &quot;Q♠&quot;  &quot;5♦&quot;  &quot;4♣&quot;  &quot;3♥&quot;  &quot;8♣&quot;  &quot;3♦&quot;  &quot;6♠&quot;  &quot;8♠&quot; 
-## [13] &quot;2♥&quot;  &quot;K♣&quot;  &quot;2♣&quot;  &quot;J♠&quot;  &quot;4♥&quot;  &quot;A♣&quot;  &quot;J♦&quot;  &quot;7♥&quot;  &quot;5♣&quot;  &quot;6♥&quot;  &quot;2♠&quot;  &quot;4♠&quot; 
-## [25] &quot;8♦&quot;  &quot;9♠&quot;  &quot;J♣&quot;  &quot;5♠&quot;  &quot;9♥&quot;  &quot;J♥&quot;  &quot;3♠&quot;  &quot;7♦&quot;  &quot;2♦&quot;  &quot;9♦&quot;  &quot;7♠&quot;  &quot;3♣&quot; 
-## [37] &quot;Q♥&quot;  &quot;K♦&quot;  &quot;10♣&quot; &quot;4♦&quot;  &quot;7♣&quot;  &quot;10♠&quot; &quot;A♦&quot;  &quot;K♠&quot;  &quot;10♥&quot; &quot;6♦&quot;  &quot;A♥&quot;  &quot;5♥&quot; 
-## [49] &quot;6♣&quot;  &quot;10♦&quot; &quot;A♠&quot;  &quot;K♥&quot;</code></pre>
+<pre><code>##  [1] &quot;10♠&quot; &quot;Q♣&quot;  &quot;J♦&quot;  &quot;5♣&quot;  &quot;8♥&quot;  &quot;9♦&quot;  &quot;4♣&quot;  &quot;2♠&quot;  &quot;7♥&quot;  &quot;6♠&quot;  &quot;K♦&quot;  &quot;5♥&quot; 
+## [13] &quot;7♠&quot;  &quot;Q♦&quot;  &quot;2♣&quot;  &quot;6♣&quot;  &quot;4♠&quot;  &quot;7♣&quot;  &quot;4♦&quot;  &quot;9♣&quot;  &quot;A♥&quot;  &quot;Q♠&quot;  &quot;K♥&quot;  &quot;10♥&quot;
+## [25] &quot;8♦&quot;  &quot;A♠&quot;  &quot;J♠&quot;  &quot;8♠&quot;  &quot;6♦&quot;  &quot;A♣&quot;  &quot;J♣&quot;  &quot;3♥&quot;  &quot;10♣&quot; &quot;J♥&quot;  &quot;5♦&quot;  &quot;A♦&quot; 
+## [37] &quot;8♣&quot;  &quot;Q♥&quot;  &quot;5♠&quot;  &quot;6♥&quot;  &quot;9♥&quot;  &quot;2♥&quot;  &quot;7♦&quot;  &quot;10♦&quot; &quot;3♣&quot;  &quot;4♥&quot;  &quot;3♦&quot;  &quot;3♠&quot; 
+## [49] &quot;9♠&quot;  &quot;K♣&quot;  &quot;2♦&quot;  &quot;K♠&quot;</code></pre>
 <pre class="r"><code>MyDeck$draw(1)</code></pre>
 <pre><code>## Error in MyDeck$draw(1): length(self$cards_in_deck) &gt;= n is not TRUE</code></pre>
 <pre class="r"><code>MyDeck$reshuffle()
 MyDeck$draw(5)</code></pre>
-<pre><code>## [1] &quot;7♣&quot; &quot;J♥&quot; &quot;4♠&quot; &quot;6♠&quot; &quot;4♦&quot;</code></pre>
+<pre><code>## [1] &quot;4♥&quot; &quot;9♠&quot; &quot;J♥&quot; &quot;3♣&quot; &quot;A♠&quot;</code></pre>
 <ol start="3" style="list-style-type: decimal">
 <li>Why can’t you model a bank account or a deck of cards with an S3
 class?</li>
@@ -707,7 +707,7 @@ should have <code>$get()</code> and <code>$set()</code> methods.</li>
 myWDer &lt;- WDer$new()
 
 myWDer$get()</code></pre>
-<pre><code>## [1] &quot;D:/Work/Advanced_R_Hadley_2nd_Ed&quot;</code></pre>
+<pre><code>## [1] &quot;D:/Advanced_R_Hadley_2nd_Ed&quot;</code></pre>
 <pre class="r"><code>myWDer$set(&quot;../..&quot;)
 myWDer$get()</code></pre>
 <pre><code>## [1] &quot;D:/&quot;</code></pre>
@@ -737,10 +737,403 @@ class(MyTest)</code></pre>
 ##   Public:
 ##     clone: function (deep = FALSE)</code></pre>
 <pre class="r"><code>MyTest$.__enclos_env__</code></pre>
-<pre><code>## &lt;environment: 0x000001a39c75c288&gt;</code></pre>
+<pre><code>## &lt;environment: 0x00000232db2588a8&gt;</code></pre>
 <p>Look like S3 objects, but they also have their own environments which
 can be seen in the top right window.</p>
 </div>
+</div>
+<div id="controlling-access" class="section level2">
+<h2>14.3 Controlling access</h2>
+<div id="privacy" class="section level3">
+<h3>14.3.1 Privacy</h3>
+<pre class="r"><code>Person &lt;- R6Class(&quot;Person&quot;, 
+  public = list(
+    initialize = function(name, age = NA) {
+      private$name &lt;- name
+      private$age &lt;- age
+    },
+    print = function(...) {
+      cat(&quot;Person: \n&quot;)
+      cat(&quot;  Name: &quot;, private$name, &quot;\n&quot;, sep = &quot;&quot;)
+      cat(&quot;  Age:  &quot;, private$age, &quot;\n&quot;, sep = &quot;&quot;)
+    }
+  ),
+  private = list(
+    age = NA,
+    name = NULL
+  )
+)
+
+hadley3 &lt;- Person$new(&quot;Hadley&quot;)
+hadley3</code></pre>
+<pre><code>## Person: 
+##   Name: Hadley
+##   Age:  NA</code></pre>
+<pre class="r"><code>hadley3$name</code></pre>
+<pre><code>## NULL</code></pre>
+</div>
+<div id="active-fields" class="section level3">
+<h3>14.3.2 Active fields</h3>
+<pre class="r"><code>Rando &lt;- R6::R6Class(&quot;Rando&quot;, active = list(
+  random = function(value) {
+    if (missing(value)) {
+      runif(1)  
+    } else {
+      stop(&quot;Can&#39;t set `$random`&quot;, call. = FALSE)
+    }
+  }
+))
+x &lt;- Rando$new()
+x$random</code></pre>
+<pre><code>## [1] 0.8923205</code></pre>
+<pre class="r"><code>x$random</code></pre>
+<pre><code>## [1] 0.2431233</code></pre>
+<pre class="r"><code>x$random</code></pre>
+<pre><code>## [1] 0.474632</code></pre>
+<pre class="r"><code>x$random &lt;- 1</code></pre>
+<pre><code>## Error: Can&#39;t set `$random`</code></pre>
+<pre class="r"><code>Person &lt;- R6Class(&quot;Person&quot;, 
+  private = list(
+    .age = NA,
+    .name = NULL
+  ),
+  active = list(
+    age = function(value) {
+      if (missing(value)) {
+        private$.age
+      } else {
+        stop(&quot;`$age` is read only&quot;, call. = FALSE)
+      }
+    },
+    name = function(value) {
+      if (missing(value)) {
+        private$.name
+      } else {
+        stopifnot(is.character(value), length(value) == 1)
+        private$.name &lt;- value
+        self
+      }
+    }
+  ),
+  public = list(
+    initialize = function(name, age = NA) {
+      private$.name &lt;- name
+      private$.age &lt;- age
+    }
+  )
+)
+
+hadley4 &lt;- Person$new(&quot;Hadley&quot;, age = 38)
+hadley4$name</code></pre>
+<pre><code>## [1] &quot;Hadley&quot;</code></pre>
+<pre class="r"><code>hadley4$name &lt;- 10</code></pre>
+<pre><code>## Error in (function (value) : is.character(value) is not TRUE</code></pre>
+<pre class="r"><code>hadley4$age &lt;- 20</code></pre>
+<pre><code>## Error: `$age` is read only</code></pre>
+</div>
+<div id="exercises-1" class="section level3">
+<h3>14.3.3 Exercises</h3>
+<ol style="list-style-type: decimal">
+<li>Create a bank account class that prevents you from directly setting
+the account balance, but you can still withdraw from and deposit to.
+Throw an error if you attempt to go into overdraft.</li>
+</ol>
+<pre class="r"><code>BankAcct &lt;- R6Class(
+  classname = &quot;BankAcct&quot;,
+  private = list(.balance = 0),
+  public = list(
+    initialize = function(balance) {
+      private$.balance &lt;- balance
+    },
+    deposit = function(amount) {
+      private$.balance &lt;- private$.balance + amount
+      invisible(self)
+    },
+    withdraw = function(amount) {
+      stopifnot(private$.balance &gt; amount)
+      private$.balance &lt;- private$.balance - amount
+      invisible(self)
+    },
+    print = function(...) {
+      cat(&quot;Balance is $&quot;, private$.balance, &quot;\n&quot;, sep = &quot;&quot;)
+    }
+  ),
+  active = list(
+    balance = function(amount) {
+      if (missing(amount)) {
+        private$.balance
+      } else {
+        stop(&quot;`$balance` is read only&quot;, call. = FALSE)
+      }
+    }
+  )
+)
+
+myBankAcct &lt;- BankAcct$new(1000)
+myBankAcct</code></pre>
+<pre><code>## Balance is $1000</code></pre>
+<pre class="r"><code>myBankAcct$deposit(100)
+myBankAcct</code></pre>
+<pre><code>## Balance is $1100</code></pre>
+<pre class="r"><code>myBankAcct$withdraw(1200)</code></pre>
+<pre><code>## Error in myBankAcct$withdraw(1200): private$.balance &gt; amount is not TRUE</code></pre>
+<pre class="r"><code>myBankAcct$balance &lt;- 10000</code></pre>
+<pre><code>## Error: `$balance` is read only</code></pre>
+<ol start="2" style="list-style-type: decimal">
+<li>Create a class with a write-only <code>$password</code> field. It
+should have <code>$check_password(password)</code> method that returns
+<code>TRUE</code> or <code>FALSE</code>, but there should be no way to
+view the complete password.</li>
+</ol>
+<pre class="r"><code>Trash &lt;- R6Class(
+  classname = &quot;Trash&quot;,
+  private = list(.password = NULL),
+  public = list(
+    initialize = function(password){
+      private$.password &lt;- password
+    },
+    check_password = function(password) {
+      private$.password == password
+    },
+    print = function(...) {
+      cat(&quot;No password for you \n&quot;)
+    }
+  ),
+  active = list(
+    password = function(password) {
+      if (!missing(password))
+        stop(&quot;Password is can only be set once&quot;)
+    }
+  )
+)
+
+MyTrash &lt;- Trash$new(&quot;Tacos&quot;)
+MyTrash</code></pre>
+<pre><code>## No password for you</code></pre>
+<pre class="r"><code>MyTrash$password</code></pre>
+<pre><code>## NULL</code></pre>
+<pre class="r"><code>MyTrash$password &lt;- &quot;asda&quot;</code></pre>
+<pre><code>## Error in (function (password) : Password is can only be set once</code></pre>
+<pre class="r"><code>MyTrash$.password</code></pre>
+<pre><code>## NULL</code></pre>
+<pre class="r"><code>MyTrash$check_password(&quot;asdasd&quot;)</code></pre>
+<pre><code>## [1] FALSE</code></pre>
+<pre class="r"><code>MyTrash$check_password(&quot;Tacos&quot;)</code></pre>
+<pre><code>## [1] TRUE</code></pre>
+<ol start="3" style="list-style-type: decimal">
+<li>Extend the <code>Rando</code> class with another active binding that
+allows you to access the previous random value. Ensure that active
+binding is the only way to access the value.</li>
+</ol>
+<pre class="r"><code>Rando &lt;- R6::R6Class(
+  &quot;Rando&quot;,
+  private = list(
+    .last_num = NULL),
+  active = list(
+    random = function(value) {
+      if (missing(value)) {
+        private$.last_num &lt;- runif(1)
+        private$.last_num
+      } else {
+        stop(&quot;Can&#39;t set `$random`&quot;, call. = FALSE)
+      }
+    },
+    last = function(value) {
+      if (missing(value)) {
+        private$.last_num
+      }
+    }
+  )
+)
+x &lt;- Rando$new()
+x$random</code></pre>
+<pre><code>## [1] 0.4450444</code></pre>
+<pre class="r"><code>x$last</code></pre>
+<pre><code>## [1] 0.4450444</code></pre>
+<pre class="r"><code>x$random</code></pre>
+<pre><code>## [1] 0.8624631</code></pre>
+<pre class="r"><code>x$last</code></pre>
+<pre><code>## [1] 0.8624631</code></pre>
+<pre class="r"><code>x$random &lt;- 1</code></pre>
+<pre><code>## Error: Can&#39;t set `$random`</code></pre>
+<ol start="4" style="list-style-type: decimal">
+<li>Can subclasses access private fields/methods from their parent?
+Perform an experiment to find out.</li>
+</ol>
+<pre class="r"><code>Super &lt;- R6Class(
+  classname = &quot;Super&quot;,
+  private = list(
+    some_text_field = &quot;ABC&quot;,
+    some_num_field = 123,
+    some_method = function() {
+      &quot;Meow&quot;
+    }
+  )
+)
+Sub &lt;- R6Class(
+  classname = &quot;Sub&quot;,
+  inherit = Super,
+  public = list(
+    show_it_all = function() {
+      cat(&quot;My text fields:&quot;, super$some_text_field, &quot;\n&quot;,
+          &quot;My num fields:&quot;, super$some_num_field, &quot;\n&quot;,
+          sep = &quot;&quot;)
+      cat(&quot;Running my method:&quot;, super$some_method())
+    }
+  )
+)
+
+MyTest &lt;- Sub$new()
+MyTest$show_it_all()</code></pre>
+<pre><code>## My text fields:
+## My num fields:
+## Running my method: Meow</code></pre>
+<p>Can access private methods from super but not private fields from
+super</p>
+</div>
+</div>
+<div id="reference-semantics" class="section level2">
+<h2>14.4 Reference semantics</h2>
+<pre class="r"><code>y1 &lt;- Accumulator$new() 
+y2 &lt;- y1
+
+c(y1 = y1$sum, y2 = y2$sum)</code></pre>
+<pre><code>## y1 y2 
+##  0  0</code></pre>
+<pre class="r"><code>y1$add(10)
+c(y1 = y1$sum, y2 = y2$sum)</code></pre>
+<pre><code>## y1 y2 
+## 10 10</code></pre>
+<pre class="r"><code>y1 &lt;- Accumulator$new() 
+y2 &lt;- y1$clone()
+
+c(y1 = y1$sum, y2 = y2$sum)</code></pre>
+<pre><code>## y1 y2 
+##  0  0</code></pre>
+<pre class="r"><code>y1$add(10)
+c(y1 = y1$sum, y2 = y2$sum)</code></pre>
+<pre><code>## y1 y2 
+## 10  0</code></pre>
+<div id="reasoning" class="section level3">
+<h3>14.4.1 Reasoning</h3>
+<pre class="r"><code>x &lt;- list(a = 1)
+y &lt;- list(b = 2)
+
+z &lt;- f(x, y)</code></pre>
+<pre><code>## Error in f(x, y): could not find function &quot;f&quot;</code></pre>
+<pre class="r"><code>x &lt;- List$new(a = 1)</code></pre>
+<pre><code>## Error in eval(expr, envir, enclos): object &#39;List&#39; not found</code></pre>
+<pre class="r"><code>y &lt;- List$new(b = 2)</code></pre>
+<pre><code>## Error in eval(expr, envir, enclos): object &#39;List&#39; not found</code></pre>
+<pre class="r"><code>z &lt;- f(x, y)</code></pre>
+<pre><code>## Error in f(x, y): could not find function &quot;f&quot;</code></pre>
+</div>
+<div id="finalizer" class="section level3">
+<h3>14.4.2 Finalizer</h3>
+<p><strong>finalized, == deleted</strong></p>
+<pre class="r"><code>x &lt;- factor(c(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;))
+levels(x) &lt;- c(&quot;c&quot;, &quot;b&quot;, &quot;a&quot;)
+x</code></pre>
+<pre><code>## [1] c b a
+## Levels: c b a</code></pre>
+<pre class="r"><code>TemporaryFile &lt;- R6Class(&quot;TemporaryFile&quot;,
+                         public = list(
+                           path = NULL,
+                           initialize = function() {
+                             self$path &lt;- tempfile()
+                           },
+                           finalize = function() {
+                             message(&quot;Cleaning up &quot;, self$path)
+                             unlink(self$path)
+                           }
+                         ))</code></pre>
+<pre class="r"><code>tf &lt;- TemporaryFile$new()
+rm(tf)</code></pre>
+</div>
+<div id="r6-fields" class="section level3">
+<h3>14.4.3 R6 fields</h3>
+<pre class="r"><code>TemporaryDatabase &lt;- R6Class(
+  &quot;TemporaryDatabase&quot;,
+  public = list(
+    con = NULL,
+    file = TemporaryFile$new(),
+    initialize = function() {
+      self$con &lt;- DBI::dbConnect(RSQLite::SQLite(), path = file$path)
+    },
+    finalize = function() {
+      DBI::dbDisconnect(self$con)
+    }
+  )
+)
+
+db_a &lt;- TemporaryDatabase$new()
+db_b &lt;- TemporaryDatabase$new()
+
+db_a$file$path == db_b$file$path</code></pre>
+<pre><code>## [1] TRUE</code></pre>
+<pre class="r"><code>TemporaryDatabase &lt;- R6Class(
+  &quot;TemporaryDatabase&quot;,
+  public = list(
+    con = NULL,
+    file = NULL,
+    initialize = function() {
+      self$file &lt;- TemporaryFile$new()
+      self$con &lt;- DBI::dbConnect(RSQLite::SQLite(), path = file$path)
+    },
+    finalize = function() {
+      DBI::dbDisconnect(self$con)
+    }
+  )
+)
+
+db_a &lt;- TemporaryDatabase$new()
+db_b &lt;- TemporaryDatabase$new()
+
+db_a$file$path == db_b$file$path</code></pre>
+<pre><code>## [1] FALSE</code></pre>
+</div>
+<div id="exercises-2" class="section level3">
+<h3>14.4.4 Exercises</h3>
+<ol style="list-style-type: decimal">
+<li>Create a class that allows you to write a line to a specified file.
+You should open a connection to the file in <code>$initialize()</code>,
+append a line using <code>cat()</code> in <code>$append_line()</code>,
+and close the connection in <code>$finalize()</code>.</li>
+</ol>
+<pre class="r"><code>Writer &lt;- R6Class(
+  classname = &quot;Writer&quot;,
+  public = list(
+    con = NULL,
+    initialize = function(filename) {
+      if(!file.exists(filename)) file.create(filename)
+      self$con &lt;- file(filename, open = &quot;a+&quot;)
+    },
+    append_line = function(text) {
+      cat(text, &quot;\n&quot;, sep = &quot;&quot;, file = self$con)
+    },
+    read_lines = function() {
+      readLines(self$con)
+    },
+    finalize = function() {
+      close(self$con)
+    }
+  )
+)
+
+MyWriter &lt;- Writer$new(&quot;test_file.txt&quot;)
+MyWriter$append_line(&quot;AAAAAAAAA&quot;)
+MyWriter$append_line(&quot;BBBBBBBBB&quot;)
+MyWriter$read_lines()</code></pre>
+<pre><code>## [1] &quot;AAAAAAAAA&quot; &quot;BBBBBBBBB&quot; &quot;AAAAAAAAA&quot; &quot;BBBBBBBBB&quot; &quot;AAAAAAAAA&quot; &quot;BBBBBBBBB&quot;</code></pre>
+<pre class="r"><code>rm(MyWriter)
+gc()</code></pre>
+<pre><code>##           used (Mb) gc trigger (Mb) max used (Mb)
+## Ncells  839071 44.9    1330590 71.1  1330590 71.1
+## Vcells 1497007 11.5    8388608 64.0  2492534 19.1</code></pre>
+</div>
+</div>
+<div id="why-r6" class="section level2">
+<h2>14.5 Why R6?</h2>
 </div>
 </div>
 
