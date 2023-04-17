@@ -1,0 +1,359 @@
+---
+title: "15_S4"
+output: html_document
+date: "2023-04-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 15. S4
+## 15.1 Introduction
+
+```{r}
+library(methods)
+library(tidyverse)
+```
+
+## 15.2 Basics
+
+```{r}
+setClass("Person", 
+  slots = c(
+    name = "character", 
+    age = "numeric"
+  )
+)
+```
+
+```{r}
+john <- new("Person", name = "John Smith", age = NA_real_)
+```
+
+```{r}
+is(john)
+john@name
+slot(john, "age")
+```
+
+```{r}
+setGeneric("age", function(x) standardGeneric("age"))
+setGeneric("age<-", function(x, value) standardGeneric("age<-"))
+```
+
+```{r}
+setMethod("age", "Person", function(x) x@age)
+setMethod("age<-", "Person", function(x, value) {
+  x@age <- value
+  x
+})
+
+age(john) <- 50
+age(john)
+```
+
+```{r}
+sloop::otype(john)
+
+sloop::ftype(age)
+```
+
+### 15.2.1 Exercises
+
+1. `lubridate::period()` returns an S4 class. What slots does it have? What class is each slot? What accessors does it provide?
+
+```{r}
+myTime <- lubridate::period(c(3, 1, 2, 13, 1), c("second", "minute", "hour", "day", "week"))
+
+myTime
+
+sloop::otype(myTime)
+
+is(myTime)
+
+slotNames(myTime)
+
+slotNames(myTime) %>%
+  map(is)
+
+str(myTime)
+
+lubridate::month(myTime)
+lubridate::hour(myTime)
+```
+
+Six slots, accessors same name as slots.
+
+2. What other ways can you find help for a method? Read `?"?"` and summarise the details.
+
+```{r, eval = F}
+help("lubridate::period")
+??lubridate::period
+?lubridate::period
+methods?lubridate::period
+Period?period
+```
+
+## 15.3 Classes
+
+```{r}
+setClass("Person", 
+  slots = c(
+    name = "character", 
+    age = "numeric"
+  ), 
+  prototype = list(
+    name = NA_character_,
+    age = NA_real_
+  )
+)
+
+me <- new("Person", name = "Hadley")
+str(me)
+```
+
+### 15.3.1 Inheritance
+
+```{r}
+setClass("Employee", 
+  contains = "Person", 
+  slots = c(
+    boss = "Person"
+  ),
+  prototype = list(
+    boss = new("Person")
+  )
+)
+
+str(new("Employee"))
+```
+
+### 15.3.2 Introspection
+
+```{r}
+is(new("Person"))
+
+is(new("Employee"))
+```
+
+```{r}
+is(john, "Person")
+```
+
+### 15.3.3 Redefinition
+
+```{r, error = T}
+setClass("A", slots = c(x = "numeric"))
+a <- new("A", x = 10)
+
+setClass("A", slots = c(a_different_slot = "numeric"))
+a
+```
+
+### 15.3.4 Helper
+
+```{r}
+Person <- function(name, age = NA) {
+  age <- as.double(age)
+  
+  new("Person", name = name, age = age)
+}
+
+Person("Hadley")
+```
+
+### 15.3.5 Validator
+
+```{r, error = T}
+Person(mtcars)
+```
+
+```{r}
+Person("Hadley", age = c(30, 37))
+```
+
+```{r}
+setValidity("Person", function(object) {
+  if (length(object@name) != length(object@age)) {
+    "@name and @age must be same length"
+  } else {
+    TRUE
+  }
+})
+```
+
+```{r, error = T}
+Person("Hadley", age = c(30, 37))
+```
+
+```{r}
+alex <- Person("Alex", age = 30)
+alex@age <- 1:10
+alex@age
+```
+
+```{r, error = T}
+validObject(alex)
+```
+
+### 15.3.6 Exercises
+
+1. Extend the Person class with fields to match `utils::person()`. Think about what slots you will need, what class each slot should have, and what you’ll need to check in your validity method.
+```{r, error = T}
+a <- utils::person("John")
+str(a)
+
+setClass(
+  "Person",
+  slots = c(
+    first_name = "character",
+    last_name = "character",
+    age = "numeric",
+    role = "character",
+    email = "character",
+    comment = "character"
+  ),
+  prototype = list(
+    first_name = NA_character_,
+    last_name = NA_character_,
+    age = NA_real_,
+    role = NA_character_,
+    email = NA_character_,
+    comment = NA_character_
+  )
+)
+
+Person <- function(first_name,
+                   last_name = NA,
+                   age = NA,
+                   role = NA,
+                   email = NA,
+                   comment = NA) {
+  last_name <- as.character(last_name)
+  age <- as.double(age)
+  role <- as.character(role)
+  email <- as.character(email)
+  comment <- as.character(comment)
+  
+  new(
+    "Person",
+    first_name = first_name,
+    last_name = last_name,
+    role = role,
+    email = email,
+    comment = comment
+  )
+}
+
+setValidity("Person", function(object) {
+  if (length(object@first_name) != 1 |
+      length(object@last_name) != 1 |
+      length(object@age) != 1 |
+      length(object@role) != 1 |
+      length(object@email) != 1 |
+      length(object@comment) != 1) {
+    "@first_name, @last_name, @age, @email, @comment must be length 1"
+  } else if (!all(
+    object@role %in% c(
+      "aut",
+      "com",
+      "cph",
+      "cre",
+      "ctb",
+      "ctr",
+      "dtc",
+      "fnd",
+      "rev",
+      "ths",
+      "trl"
+    )
+  )) {
+    '@role must be one of ("aut", "com", "cph", "cre", "ctb", "ctr", "dtc", "fnd", "rev", "ths","trl")'
+  } else {
+    TRUE
+  }
+})
+
+John <-
+  new(
+    "Person",
+    first_name = "John",
+    last_name = "Davis",
+    role = c("asdasd", "asdasdaaaa")
+  )
+John <-
+  new("Person",
+      first_name = "John",
+      last_name = "Davis",
+      role = "asdasdaaaa")
+John <-
+  new("Person",
+      first_name = "John",
+      last_name = "Davis",
+      role = "aut")
+```
+
+2. What happens if you define a new S4 class that doesn’t have any slots? (Hint: read about virtual classes in `?setClass`.)
+
+```{r, error = T}
+setClass("Emptiness")
+
+testcase <- new("Emptiness")
+
+setClass("Something", contains = "Emptiness")
+```
+You get an error when trying to make an object using the virtual class. "If the class is virtual, an attempt to generate an object from either the generator or new() will result in an error." You can inherit it. Apparently common and useful for _class union_
+
+3. Imagine you were going to reimplement factors, dates, and data frames in S4. Sketch out the `setClass()` calls that you would use to define the classes. Think about appropriate slots and prototype.
+
+```{r, eval = T}
+setClass("MyFactor",
+         slots = c(
+           values = "integer",
+           levels = "character",
+           ordered = "logical"
+         ),
+         prototype = c(
+           values = NA_integer_,
+           levels = NA_character_,
+           ordered = FALSE
+         ))
+
+new("MyFactor",
+    values = c(1L,10L),
+    levels = c("low", "high"),
+    ordered = T)
+
+setClass("MyDate",
+         slots = c(
+           date = "integer"
+         ),
+         prototype = c(
+           date = NA_integer_
+         ))
+
+new("MyDate", date = 12L)
+
+setClass("MyDataFrame",
+         slots = c(
+           data = "list",
+           row.names = "character"
+         ),
+         prototype = c(
+           data = list(),
+           row.names = NA_character_
+         ))
+
+new("MyDataFrame",
+    data = list(aaa = c(12,53),
+                bbb = c(5235,341634),
+                ccc = c(334534,4362113)))
+
+new("MyDataFrame",
+    data = list(aaa = c(12,53),
+                bbb = c(5235,341634),
+                ccc = c(334534,4362113)),
+    row.names = c("This", "is", "bad"))
+```
+
