@@ -1,0 +1,187 @@
+---
+title: "17 Big Picture"
+output:
+  html_document:
+    df_print: paged
+date: "2023-04-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 17.1 Introduction
+
+```{r}
+library(rlang)
+library(lobstr)
+```
+
+## 17.2 Code is data
+
+```{r}
+expr(mean(x, na.rm = TRUE))
+expr(10 + 100 + 1000)
+```
+
+```{r}
+capture_it <- function(x) {
+  expr(x)
+}
+capture_it(a + b + c)
+```
+
+```{r}
+capture_it <- function(x) {
+  enexpr(x)
+}
+capture_it(a + b + c)
+```
+
+```{r}
+f <- expr(f(x = 1, y = 2))
+f
+
+f$z <- 3
+f
+
+f[[2]] <- NULL
+f
+```
+
+## 17.3 Code is a tree
+
+```{r}
+lobstr::ast(f(a, "b"))
+```
+```{r}
+lobstr::ast(f1(f2(a, b), f3(1, f4(2))))
+```
+
+```{r}
+lobstr::ast(1 + 2 * 3)
+```
+
+## 17.3 Code can generate code
+```{r}
+call2("f", 1, 2, 3)
+
+call2("+", 1, call2("*", 2, 3))
+```
+
+```{r}
+xx <- expr(x + x)
+xx
+yy <- expr(y + y)
+yy
+
+expr(xx / yy)
+expr(!!xx / !!yy)
+```
+
+```{r}
+cv <- function(var) {
+  var <- enexpr(var)
+  expr(sd(!!var) / mean(!!var))
+}
+
+cv(x)
+
+cv(x+y)
+```
+
+```{r}
+cv(`)`)
+```
+
+## 17.5 Evaluation runs code
+```{r}
+eval(expr(x + y), env(x = 1, y = 10))
+
+eval(expr(x + y), env(x = 2, y = 100))
+```
+
+```{r}
+x <- 10
+y <- 100
+eval(expr(x + y))
+```
+
+## 17.6 Customising evaluation with functions
+
+```{r}
+string_math <- function(x) {
+  e <- env(
+    caller_env(),
+    `+` = function(x, y) paste0(x, y),
+    `*` = function(x, y) strrep(x, y)
+  )
+
+  eval(enexpr(x), e)
+}
+
+name <- "Hadley"
+
+string_math("Hello " + name)
+
+string_math(("x" * 2 + "-y") * 3)
+```
+
+```{r}
+library(dplyr)
+```
+
+```{r}
+con <- DBI::dbConnect(RSQLite::SQLite(), filename = ":memory:")
+mtcars_db <- copy_to(con, mtcars)
+
+mtcars_db %>%
+  filter(cyl > 2) %>%
+  select(mpg:hp) %>%
+  head(10) %>%
+  show_query()
+
+DBI::dbDisconnect(con)
+```
+
+## 17.7 Customising evaluation with data
+
+```{r}
+df <- data.frame(x = 1:5, y = sample(5))
+df
+
+eval_tidy(expr(x + y), df)
+```
+
+```{r}
+with2 <- function(df, expr) {
+  eval_tidy(enexpr(expr), df)
+}
+
+with2(df, x + y) # Has bug which requires new data structure
+```
+
+## 17.8 Quosures
+
+```{r}
+with2 <- function(df, expr) {
+  a <- 1000
+  eval_tidy(enexpr(expr), df)
+}
+```
+
+```{r}
+df <- data.frame(x = 1:3)
+a <- 10
+with2(df, x + a)
+```
+
+```{r}
+with2 <- function(df, expr) {
+  a <- 1000
+  eval_tidy(enquo(expr), df)
+}
+
+with2(df, x + a)
+```
+
