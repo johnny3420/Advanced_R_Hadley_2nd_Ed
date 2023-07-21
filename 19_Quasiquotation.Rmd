@@ -1,0 +1,232 @@
+---
+title: "19 Quasiquotation"
+output: html_document
+date: "2023-07-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 19 Quasiquotation
+## 19.1 Introduction
+
+```{r}
+library(rlang)
+library(purrr)
+```
+
+## 19.2 Motivation
+```{r}
+paste("Good", "morning", "Hadley")
+
+paste("Good", "afternoon", "Alice")
+```
+
+```{r}
+cement <- function(...) {
+  args <- ensyms(...)
+  paste(purrr::map(args, as_string), collapse = " ")
+}
+
+cement(Good, morning, Hadley)
+
+cement(Good, afternoon, Alice)
+```
+
+```{r}
+name <- "Hadley"
+time <- "morning"
+
+paste("Good", time, name)
+```
+
+```{r}
+cement(Good, time, name)
+```
+
+```{r}
+cement(Good, !!time, !!name)
+```
+
+```{r}
+paste("Good", time, name)
+cement(Good, !!time, !!name)
+```
+
+### 19.2.1 Vocabulary
+
+```{r, eval = FALSE}
+library(MASS)
+
+# fails
+MASS
+```
+### 19.2.2 Exercises
+
+1.For each function in the following base R code, identify which arguments are quoted and which are evaluated.
+
+```{r, error = TRUE}
+library(MASS) # MASS is quoted
+MASS
+
+mtcars2 <- subset(mtcars, cyl == 4) # mtcars is evaluated, and cyl is quoted
+mtcars
+cyl == 4
+
+with(mtcars2, sum(vs)) # mtcars is evaluated and sum(vs) is quoted
+mtcars2
+sum(vs)
+
+sum(mtcars2$am) #mtcars2$am is evaulated and am is quoted
+mtcars2$am
+$am
+
+rm(mtcars2) # mtcars2 is quoted
+```
+
+2. For each function in the following tidyverse code, identify which arguments are quoted and which are evaluated.
+
+```{r}
+library(dplyr) # dplyr is quoted
+library(ggplot2) #ggplot2 is quoted
+
+by_cyl <- mtcars %>% # mtcars is evaluated
+  group_by(cyl) %>% #cyl is quoted
+  summarise(mean = mean(mpg)) # mean = mean(mpg) is quoted
+
+ggplot(by_cyl, aes(cyl, mean)) + geom_point() # by_cyl evaluated, aes is evaluated, cyl and mean are quoted
+```
+
+## 19.3 Quoting
+### 19.3.1 Capturing expressions
+
+```{r}
+expr(x + y)
+
+expr(1 / 2 / 3)
+```
+
+```{r}
+f1 <- function(x) expr(x)
+f1(a + b + c)
+```
+
+```{r}
+f2 <- function(x) enexpr(x)
+f2(a + b + c)
+```
+
+```{r}
+f <- function(...) enexprs(...)
+f(x = 1, y = 10 * z)
+```
+
+```{r}
+exprs(x = x ^ 2, y = y ^ 3, z = z ^ 4)
+```
+### 19.3.2 Capturing symbols
+```{r}
+f <- function(...) ensyms(...)
+f(x)
+
+
+f("x")
+```
+
+### 19.3.3 With base R
+
+```{r}
+quote(x + y)
+```
+
+```{r}
+f3 <- function(x) substitute(x)
+f3(x + y)
+```
+
+```{r}
+alist(x = 1, y = x + 2)
+```
+
+```{r}
+f <- function(...) as.list(substitute(...()))
+f(x = 1, y = 10 * z)
+```
+
+### 19.3.4 Substitution
+```{r}
+f4 <- function(x) substitute(x * 2)
+f4(a + b + c)
+```
+
+```{r}
+substitute(x * y * z, list(x = 10, y = quote(a + b)))
+```
+
+### 19.3.5 Summary
+### 19.3.6 Exercises
+
+1. How is `expr()` implemented? Look at its source code.
+```{r}
+expr
+```
+It's a wrapper for `enexpr`
+
+2. Compare and contrast the following two functions. Can you predict the output before running them?
+
+```{r}
+f1 <- function(x, y) {
+  exprs(x = x, y = y)
+} # captures x = x and y = y
+f2 <- function(x, y) {
+  enexprs(x = x, y = y)
+} # captures the user input en is for users input therefore we'd get x = a + b and y = c + d
+f1(a + b, c + d)
+f2(a + b, c + d)
+```
+
+3. What happens if you try to use `enexpr()` with an expression (i.e.  `enexpr(x + y)` ? What happens if `enexpr()` is passed a missing argument?
+
+```{r, error = T}
+enexpr(x + y)
+```
+You get an error, the argument has to be a symbol
+
+```{r, error = T}
+enexpr(x = )
+```
+You get an error for an unused argument
+
+4. How are `exprs(a)` and `exprs(a = )` different? Think about both the input and the output.
+
+```{r}
+exprs(a)
+
+exprs(a = )
+```
+First one you get a list with the value "a" in the second you get a list with an object "a" which doesn't have a value
+
+5. What are other differences between `exprs()` and `alist()`? Read the documentation for the named arguments of `exprs()` to find out.
+
+.named 	If TRUE, unnamed inputs are automatically named with as_label()  
+
+.ignore_empty Whether to ignore empty arguments. Can be one of "trailing", "none", "all". If "trailing"
+
+6. The documentation for `substitute()` says:
+
+Substitution takes place by examining each component of the parse tree as follows:
+
+* If it is not a bound symbol in env, it is unchanged.
+* If it is a promise object (i.e., a formal argument to a function) the expression slot of the promise replaces the symbol.
+* If it is an ordinary variable, its value is substituted, unless env is .GlobalEnv in which case the symbol is left unchanged.
+
+```{r}
+substitute(x + y, list(x = 2)) # y does not change
+
+substitute(mean(x, ...), list(x = 1, na.rm = T)) # spits back the function with the symbols replaced
+
+y <- 5
+substitute(x + y, .GlobalEnv) # doesn't change y
+```
+
