@@ -230,3 +230,618 @@ y <- 5
 substitute(x + y, .GlobalEnv) # doesn't change y
 ```
 
+## 19.4 Unquoting
+### 19.4.1 Unquoting one argument
+
+```{r}
+x <- expr(-1)
+expr(f(!!x, y))
+```
+
+```{r}
+a <- sym("y")
+b <- 1
+expr(f(!!a, !!b))
+```
+
+```{r}
+mean_rm <- function(var) {
+  var <- ensym(var)
+  expr(mean(!!var, na.rm = TRUE))
+}
+expr(!!mean_rm(x) + !!mean_rm(y))
+```
+
+```{r}
+x1 <- expr(x + 1)
+x2 <- expr(x + 2)
+
+expr(!!x1 / !!x2)
+```
+
+### 19.4.2 Unquoting a function
+
+```{r}
+f <- expr(foo)
+expr((!!f)(x, y))
+```
+
+```{r}
+f <- expr(pkg::foo)
+expr((!!f)(x, y))
+```
+
+```{r}
+f <- expr(pkg::foo)
+call2(f, expr(x), expr(y))
+```
+
+### 19.4.3 Unquoting a missing argument
+```{r, error = TRUE}
+arg <- missing_arg()
+expr(foo(!!arg, !!arg))
+```
+
+```{r}
+expr(foo(!!maybe_missing(arg), !!maybe_missing(arg)))
+```
+
+### 19.4.4 Unquoting in special forms
+```{r, error = TRUE}
+expr(df$!!x)
+```
+
+```{r}
+x <- expr(x)
+expr(`$`(df, !!x))
+```
+
+### 19.4.5 Unquoting many arguments
+
+```{r}
+xs <- exprs(1, a, -b)
+expr(f(!!!xs, y))
+```
+
+```{r}
+ys <- set_names(xs, c("a", "b", "c"))
+expr(f(!!!ys, d = 4))
+```
+
+```{r}
+call2("f", !!!xs, expr(y))
+```
+
+### 19.4.6 The polite fiction of !!
+
+```{r}
+!!TRUE
+!!!TRUE
+```
+
+```{r, error = TRUE}
+x <- quote(variable)
+!!x
+```
+
+```{r}
+# BAD
+df <- data.frame(x = 1:5)
+y <- 100
+with(df, x + !!y)
+```
+
+### 19.4.7 Non-standard ASTs
+```{r}
+x1 <- expr(class(!!data.frame(x = 10)))
+x1
+eval(x1)
+```
+
+```{r}
+expr_print(x1)
+
+lobstr::ast(!!x1)
+```
+
+```{r}
+x2 <- expr(f(!!c(1L, 2L, 3L, 4L, 5L)))
+x2
+
+expr_print(x2)
+
+lobstr::ast(!!x2)
+```
+
+```{r}
+x3 <- expr(1 + !!expr(2 + 3))
+x3
+
+lobstr::ast(!!x3)
+```
+
+### 19.4.8 Exercises
+1. Given the following components:, Use quasiquotation to construct the following calls:
+```{r}
+xy <- expr(x + y)
+xz <- expr(x + z)
+yz <- expr(y + z)
+abc <- exprs(a, b, c)
+```
+
+```{r}
+# (x + y) / (y + z)
+expr(!!xy / !!yz)
+
+#-(x + z) ^ (y + z)
+expr(-`^`(!!xz, !!yz))
+
+# (x + y) + (y + z) - (x + y)
+expr(((!!xy)) + !!yz - !!xy)
+
+#atan2(x + y, y + z)
+expr(atan2(!!xy, !!yz))
+
+#sum(x + y, x + y, y + z)
+expr(sum(!!xy, !!xy, !!yz))
+
+#sum(a, b, c)
+expr(sum(!!!abc))
+
+#mean(c(a, b, c), na.rm = TRUE)
+expr(mean(c(!!!abc), na.rm = TRUE))
+
+#foo(a = x + y, b = y + z)
+expr(foo(a = !!xy, b = !!yz))
+```
+
+2. The following two calls print the same, but are actually different:
+
+```{r}
+(a <- expr(mean(1:10)))
+
+(b <- expr(mean(!!(1:10))))
+
+(c <- expr(mean(!!1:10)))
+
+identical(a, b)
+identical(a,c)
+mean(1:10)
+mean(!!(1:10))
+```
+
+The first is taking the mean of 1:10, while the second is taking the mean of a vector TRUEs. The second takes 1:10, negates it, were TRUE, now they're FALSE, then negates that to all TRUE. The presence of the `()` causes this
+
+## 19.5 Non-quoting
+
+```{r}
+xyz <- bquote((x + y + z))
+bquote(-.(xyz) / 2)
+```
+
+```{r}
+x <- list(var = 1, y = 2)
+var <- "y"
+
+x$var
+
+x[[var]]
+```
+
+```{r}
+x <- 1
+rm(x)
+
+y <- 2
+vars <- c("y", "vars")
+rm(list = vars)
+```
+
+```{r}
+# Shows help for var
+help(var)
+
+var <- "mean"
+# Shows help for mean
+help(var)
+
+var <- 10
+# Shows help for var
+help(var)
+```
+
+```{r}
+palette(RColorBrewer::brewer.pal(3, "Set1"))
+plot(
+  Sepal.Length ~ Petal.Length, 
+  data = iris, 
+  col = Species, 
+  pch = 20, 
+  cex = 2
+)
+```
+
+## 19.6 ... (dot-dot-dot)
+
+```{r}
+dfs <- list(
+  a = data.frame(x = 1, y = 2),
+  b = data.frame(x = 3, y = 4)
+)
+```
+
+```{r}
+var <- "x"
+val <- c(4, 3, 9)
+```
+
+```{r}
+dplyr::bind_rows(!!!dfs)
+```
+
+```{r}
+tibble::tibble(!!var := val)
+```
+
+```{r, error = TRUE}
+tibble::tibble(!!var = value)
+```
+
+### 19.6.1 Examples
+
+```{r}
+set_attr <- function(.x, ...) {
+  attr <- rlang::list2(...)
+  attributes(.x) <- attr
+  .x
+}
+
+attrs <- list(x = 1, y = 2)
+attr_name <- "z"
+
+1:10 %>%
+  set_attr(w = 0, !!!attrs, !!attr_name := 3) %>% 
+  str()
+```
+
+### 19.6.2 exec()
+
+```{r}
+# Directly
+exec("mean", x = 1:10, na.rm = TRUE, trim = 0.1)
+
+# Indirectly
+args <- list(x = 1:10, na.rm = TRUE, trim = 0.1)
+exec("mean", !!!args)
+
+# Mixed
+params <- list(na.rm = TRUE, trim = 0.1)
+exec("mean", x = 1:10, !!!params)
+```
+
+```{r}
+arg_name <- "na.rm"
+arg_val <- TRUE
+exec("mean", 1:10, !!arg_name := arg_val)
+```
+
+```{r}
+x <- c(runif(10), NA)
+funs <- c("mean", "median", "sd")
+
+purrr::map_dbl(funs, exec, x, na.rm = TRUE)
+```
+
+### 19.6.3 dots_list()
+
+```{r}
+# Can easily move x to first entry:
+tibble::tibble(
+  y = 1:5,
+  z = 3:-1,
+  x = 5:1,
+)
+
+# Need to remove comma from z and add comma to x
+data.frame(
+  y = 1:5,
+  z = 3:-1,
+  x = 5:1
+)
+```
+
+```{r, error = TRUE}
+str(dots_list(x = 1, x = 2))
+
+
+str(dots_list(x = 1, x = 2, .homonyms = "first"))
+
+
+str(dots_list(x = 1, x = 2, .homonyms = "last"))
+
+
+str(dots_list(x = 1, x = 2, .homonyms = "error"))
+```
+
+### 19.6.4 With base R
+
+```{r}
+do.call("rbind", dfs)
+```
+
+```{r}
+args <- list(val)
+names(args) <- var
+
+do.call("data.frame", args)
+```
+
+```{r}
+f <- function(...) {
+  dots <- list(...)
+  if (length(dots) == 1 && is.list(dots[[1]])) {
+    dots <- dots[[1]]
+  }
+  
+  # Do something
+  ...
+}
+```
+
+```{r}
+f <- function(..., .dots) {
+  dots <- c(list(...), .dots)
+  # Do something
+}
+```
+
+### 19.6.5 Exercises
+
+1. One way to implement exec() is shown below. Describe how it works. What are the key ideas?
+
+```{r}
+exec <- function(f, ..., .env = caller_env()) {
+  args <- list2(...)
+  do.call(f, args, envir = .env)
+}
+```
+
+This new exec command works the same as the previous example except it allows you to specify the environment from which to search for variables from. It then runs the function and along with the provided args. By default it uses the environment of the exec function
+
+2. Carefully read the source code for `interaction()`, `expand.grid()`, and `par()`. Compare and contrast the techniques they use for switching between dots and list behaviour.
+
+```{r}
+#interaction
+#par
+#expand.grid
+```
+`interaction` first gathers ... into an object called args using `list`, checks to make sure it's not empty. If ... is of length 1 and is a list it changes its args and narg arguments. It then processes each item in args.
+
+`par` first gathers ... into an object called args using `list`. It checks if args is empty and adds .Pars if it is
+
+`expand.grid` does the same thing and decides what to do based on the length of nargs
+
+3. Explain the problem with this definition of `set_attr()`
+
+```{r, error = TRUE}
+set_attr <- function(x, ...) {
+  attr <- rlang::list2(...)
+  attributes(x) <- attr
+  x
+}
+set_attr(1:10, x = 10)
+
+set_attr <- function(.x, ...) {
+  attr <- rlang::list2(...)
+  attributes(.x) <- attr
+  .x
+}
+set_attr(1:10, x = 10)
+```
+
+The use of `x` instead of `.x` leads to name conflict issues
+
+## 19.7 Case studies
+
+### 19.7.1 lobstr::ast()
+```{r}
+z <- expr(foo(x, y))
+lobstr::ast(z)
+```
+
+```{r}
+lobstr::ast(!!z)
+```
+
+### 19.7.2 Map-reduce to generate code
+
+```{r}
+intercept <- 10
+coefs <- c(x1 = 5, x2 = -4)
+```
+
+```{r}
+coef_sym <- syms(names(coefs))
+coef_sym
+```
+
+```{r}
+summands <- map2(coef_sym, coefs, ~ expr((!!.x * !!.y)))
+summands
+```
+
+```{r}
+summands <- c(intercept, summands)
+summands
+```
+
+```{r}
+eq <- reduce(summands, ~ expr(!!.x + !!.y))
+eq
+```
+
+```{r}
+var <- expr(y)
+coef_sym <- map(seq_along(coefs), ~ expr((!!var)[[!!.x]]))
+coef_sym
+```
+
+```{r}
+linear <- function(var, val) {
+  var <- ensym(var)
+  coef_name <- map(seq_along(val[-1]), ~ expr((!!var)[[!!.x]]))
+
+  summands <- map2(val[-1], coef_name, ~ expr((!!.x * !!.y)))
+  summands <- c(val[[1]], summands)
+
+  reduce(summands, ~ expr(!!.x + !!.y))
+}
+
+linear(x, c(10, 5, -4))
+```
+
+### 19.7.3 Slicing an array
+
+```{r}
+indices <- rep(list(missing_arg()), 3)
+expr(x[!!!indices])
+```
+
+```{r}
+indices[[2]] <- 1
+expr(x[!!!indices])
+```
+
+```{r}
+slice <- function(x, along, index) {
+  stopifnot(length(along) == 1)
+  stopifnot(length(index) == 1)
+    
+  nd <- length(dim(x))
+  indices <- rep(list(missing_arg()), nd)
+  indices[[along]] <- index
+  
+  expr(x[!!!indices])
+}
+
+x <- array(sample(30), c(5, 2, 3))
+
+slice(x, 1, 3)
+
+slice(x, 2, 2)
+
+slice(x, 3, 1)
+```
+
+### 19.7.4 Creating functions
+
+```{r}
+new_function(
+  exprs(x = , y = ), 
+  expr({x + y})
+)
+```
+
+```{r}
+power <- function(exponent) {
+  new_function(
+    exprs(x = ), 
+    expr({
+      x ^ !!exponent
+    }), 
+    caller_env()
+  )
+}
+power(0.5)
+```
+
+```{r}
+curve(sin(exp(4 * x)), n = 1000)
+```
+
+```{r}
+curve2 <- function(expr, xlim = c(0, 1), n = 100) {
+  expr <- enexpr(expr)
+  f <- new_function(exprs(x = ), expr)
+  
+  x <- seq(xlim[1], xlim[2], length = n)
+  y <- f(x)
+
+  plot(x, y, type = "l", ylab = expr_text(expr))
+}
+curve2(sin(exp(4 * x)), n = 1000)
+```
+
+### 19.7.5 Exercises
+
+1. In the linear-model example, we could replace the `expr()` in `reduce(summands, ~ expr(!!.x + !!.y))` with `call2()`: `reduce(summands, call2, "+")`. Compare and contrast the two approaches. Which do you think is easier to read?
+
+```{r, error = TRUE}
+# expr version
+linear <- function(var, val) {
+  var <- ensym(var)
+  coef_name <- map(seq_along(val[-1]), ~ expr((!!var)[[!!.x]]))
+
+  summands <- map2(val[-1], coef_name, ~ expr((!!.x * !!.y)))
+  summands <- c(val[[1]], summands)
+
+  reduce(summands, ~ expr(!!.x + !!.y))
+}
+
+linear(x, c(10, 5, -4))
+
+# call2 version
+linear <- function(var, val) {
+  var <- ensym(var)
+  coef_name <- map(seq_along(val[-1]), ~ expr((!!var)[[!!.x]]))
+
+  summands <- map2(val[-1], coef_name, ~ expr((!!.x * !!.y)))
+  summands <- c(val[[1]], summands)
+
+  reduce(summands, call2, "+")
+}
+
+linear(x, c(10, 5, -4))
+```
+
+The `expr` command makes it a lot obvious what is going on. Also the `call2` code isn't working
+
+2. Re-implement the Box-Cox transform defined below using unquoting and `new_function()`:
+
+```{r}
+bc <- function(lambda) {
+  new_function(
+    exprs(x = ), 
+    if (lambda == 0) {
+      expr({log(x)})}
+    else {
+      expr({(x ^ lambda - 1) / lambda})
+    },
+    caller_env()
+  )
+}
+
+bc(lambda = 0)
+
+bc(lambda = 5)
+```
+
+3. Re-implement the simple `compose()` defined below using quasiquotation and `new_function()`:
+
+```{r}
+compose <- function(f, g) {
+  f <- enexpr(f)
+  g <- enexpr(g)
+  new_function(
+    exprs(... =),
+    expr((!!f)((!!g)(...))),
+    caller_env()
+  )
+}
+
+compose(abs, sum)
+wtf <- compose(abs, sum)
+wtf(c(1,3,5,6))
+wtf(c(1,3,5,6,-20))
+```
+## 19.8 History
