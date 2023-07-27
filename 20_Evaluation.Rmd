@@ -1,0 +1,281 @@
+---
+title: "20 Evaluation"
+output: html_document
+date: "2023-07-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 20.1 Introduction
+
+```{r}
+library(rlang)
+library(purrr)
+```
+
+## 20.2 Evaluation basics
+
+```{r}
+x <- 10
+eval(expr(x))
+
+y <- 2
+eval(expr(x + y))
+```
+
+```{r}
+eval(expr(x + y), env(x = 1000))
+```
+
+```{r}
+eval(print(x + 1), env(x = 1000))
+```
+
+```{r}
+eval(expr(print(x + 1)), env(x = 1000))
+```
+
+### 20.2.1 Application: `local()`
+
+```{r, error = T}
+# Clean up variables created earlier
+rm(x, y)
+
+foo <- local({
+  x <- 10
+  y <- 200
+  x + y
+})
+
+foo
+
+x
+
+y
+```
+
+```{r, error = TRUE}
+local2 <- function(expr) {
+  env <- env(caller_env())
+  eval(enexpr(expr), env)
+}
+
+foo <- local2({
+  x <- 10
+  y <- 200
+  x + y
+})
+
+foo
+
+x
+
+y
+```
+
+### 20.2.2 Application: `source()`
+
+```{r}
+source2 <- function(path, env = caller_env()) {
+  file <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  exprs <- parse_exprs(file)
+
+  res <- NULL
+  for (i in seq_along(exprs)) {
+    res <- eval(exprs[[i]], env)
+  }
+
+  invisible(res)
+}
+```
+
+```{r}
+source3 <- function(file, env = parent.frame()) {
+  lines <- parse(file)
+  res <- eval(lines, envir = env)
+  invisible(res)
+}
+```
+
+### 20.2.3 Gotcha: `function()`
+
+```{r}
+x <- 10
+y <- 20
+f <- eval(expr(function(x, y) !!x + !!y))
+f
+```
+
+```{r}
+lobstr::ast(f)
+```
+
+
+```{r}
+f()
+```
+
+```{r}
+attr(f, "srcref") <- NULL
+f
+```
+
+
+```{r}
+lobstr::ast(f)
+```
+### 20.2.4 Exercises
+
+1. Carefully read the documentation for `source()`. What environment does it use by default? What if you supply `local = TRUE`? How do you provide a custom environment?
+
+2. Predict the results of the following lines of code:
+
+```{r}
+eval(expr(eval(expr(eval(expr(2 + 2))))))
+eval(eval(expr(eval(expr(eval(expr(2 + 2)))))))
+expr(eval(expr(eval(expr(eval(expr(2 + 2)))))))
+```
+
+3. Fill in the function bodies below to re-implement `get()` using `sym()` and `eval()`, and `assign()` using `sym()`, `expr()`, and `eval()`. Don’t worry about the multiple ways of choosing an environment that `get()` and `assign()` support; assume that the user supplies it explicitly.
+
+4. Modify `source2()` so it returns the result of every expression, not just the last one. Can you eliminate the for loop?
+
+5. We can make `base::local()` slightly easier to understand by spreading out over multiple lines:
+
+```{r}
+local3 <- function(expr, envir = new.env()) {
+  call <- substitute(eval(quote(expr), envir))
+  eval(call, envir = parent.frame())
+}
+```
+
+Explain how `local()` works in words. (Hint: you might want to `print(call)` to help understand what `substitute()` is doing, and read the documentation to remind yourself what environment `new.env()` will inherit from.)
+
+## 20.3 Quosures
+
+### 20.3.1 Creating
+
+```{r}
+foo <- function(x) enquo(x)
+foo(a + b)
+```
+
+```{r}
+quo(x + y + z)
+```
+
+```{r}
+new_quosure(expr(x + y), env(x = 1, y = 10))
+```
+
+### 20.3.2 Evaluating
+
+```{r}
+q1 <- new_quosure(expr(x + y), env(x = 1, y = 10))
+eval_tidy(q1)
+```
+
+### 20.3.3 Dots
+
+```{r}
+f <- function(...) {
+  x <- 1
+  g(..., f = x)
+}
+g <- function(...) {
+  enquos(...)
+}
+
+x <- 0
+qs <- f(global = x)
+qs
+```
+
+```{r}
+map_dbl(qs, eval_tidy)
+```
+
+### 20.3.4 Under the hood
+
+```{r}
+f <- ~runif(3)
+str(f)
+```
+
+```{r}
+q4 <- new_quosure(expr(x + y + z))
+class(q4)
+```
+
+```{r}
+is_call(q4)
+
+q4[[1]]
+
+q4[[2]]
+```
+
+```{r}
+attr(q4, ".Environment")
+```
+
+```{r}
+get_expr(q4)
+
+get_env(q4)
+```
+
+### 20.3.5 Nested quosures
+
+```{r}
+q2 <- new_quosure(expr(x), env(x = 1))
+q3 <- new_quosure(expr(x), env(x = 10))
+
+x <- expr(!!q2 + !!q3)
+```
+
+```{r}
+eval_tidy(x)
+```
+
+```{r}
+x
+```
+
+```{r}
+expr_print(x)
+```
+
+### 20.3.6 Exercises
+
+1. Predict what each of the following quosures will return if evaluated.
+
+```{r}
+q1 <- new_quosure(expr(x), env(x = 1))
+q1
+#> <quosure>
+#> expr: ^x
+#> env:  0x7fac62d19130
+
+q2 <- new_quosure(expr(x + !!q1), env(x = 10))
+q2
+#> <quosure>
+#> expr: ^x + (^x)
+#> env:  0x7fac62e35a98
+
+q3 <- new_quosure(expr(x + !!q2), env(x = 100))
+q3
+#> <quosure>
+#> expr: ^x + (^x + (^x))
+#> env:  0x7fac6302feb0
+```
+
+```{r}
+
+```
+
+2. Write an `enenv()` function that captures the environment associated with an argument. (Hint: this should only require two function calls.)
+
+## 20.4 Data masks
