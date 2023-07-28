@@ -798,7 +798,7 @@ linear <- function(var, val) {
   summands <- map2(val[-1], coef_name, ~ expr((!!.x * !!.y)))
   summands <- c(val[[1]], summands)
 
-  reduce(summands, call2, "+")
+  reduce(summands, call2, .fn = "+")
 }
 
 linear(x, c(10, 5, -4))

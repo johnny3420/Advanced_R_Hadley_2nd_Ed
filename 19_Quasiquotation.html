@@ -534,7 +534,7 @@ code.</li>
 ## {
 ##     enexpr(expr)
 ## }
-## &lt;bytecode: 0x000002a843e15718&gt;
+## &lt;bytecode: 0x000001a210a676c0&gt;
 ## &lt;environment: namespace:rlang&gt;</code></pre>
 <p>It’s a wrapper for <code>enexpr</code></p>
 <ol start="2" style="list-style-type: decimal">
@@ -881,7 +881,7 @@ exec(&quot;mean&quot;, 1:10, !!arg_name := arg_val)</code></pre>
 funs &lt;- c(&quot;mean&quot;, &quot;median&quot;, &quot;sd&quot;)
 
 purrr::map_dbl(funs, exec, x, na.rm = TRUE)</code></pre>
-<pre><code>## [1] 0.6051636 0.7043116 0.2505315</code></pre>
+<pre><code>## [1] 0.4036039 0.4051645 0.2101875</code></pre>
 </div>
 <div id="dots_list" class="section level3">
 <h3>19.6.3 dots_list()</h3>
@@ -1171,12 +1171,11 @@ linear &lt;- function(var, val) {
   summands &lt;- map2(val[-1], coef_name, ~ expr((!!.x * !!.y)))
   summands &lt;- c(val[[1]], summands)
 
-  reduce(summands, call2, &quot;+&quot;)
+  reduce(summands, call2, .fn = &quot;+&quot;)
 }
 
 linear(x, c(10, 5, -4))</code></pre>
-<pre><code>## Error in `fn()`:
-## ! Can&#39;t create call to non-callable object</code></pre>
+<pre><code>## 10 + (5 * x[[1L]]) + (-4 * x[[2L]])</code></pre>
 <p>The <code>expr</code> command makes it a lot obvious what is going
 on. Also the <code>call2</code> code isn’t working</p>
 <ol start="2" style="list-style-type: decimal">
