@@ -504,6 +504,18 @@ expression, not just the last one. Can you eliminate the for loop?</li>
   file &lt;- paste(readLines(path, warn = FALSE), collapse = &quot;\n&quot;)
   exprs &lt;- parse_exprs(file)
 
+  res &lt;- NULL
+  for (i in seq_along(exprs)) {
+    res &lt;- eval(exprs[[i]], env)
+  }
+
+  invisible(res)
+}
+
+source2 &lt;- function(path, env = caller_env()) {
+  file &lt;- paste(readLines(path, warn = FALSE), collapse = &quot;\n&quot;)
+  exprs &lt;- parse_exprs(file)
+
   res &lt;- map(exprs, eval, env)
 
   invisible(res)
@@ -540,7 +552,7 @@ foo(a + b)</code></pre>
 <pre class="r"><code>new_quosure(expr(x + y), env(x = 1, y = 10))</code></pre>
 <pre><code>## &lt;quosure&gt;
 ## expr: ^x + y
-## env:  0x000002c4a68da598</code></pre>
+## env:  0x000001a5584e8d60</code></pre>
 </div>
 <div id="evaluating" class="section level3">
 <h3>20.3.2 Evaluating</h3>
@@ -571,7 +583,7 @@ qs</code></pre>
 ## $f
 ## &lt;quosure&gt;
 ## expr: ^x
-## env:  0x000002c4a70db870</code></pre>
+## env:  0x000001a558cd1198</code></pre>
 <pre class="r"><code>map_dbl(qs, eval_tidy)</code></pre>
 <pre><code>## global      f 
 ##      0      1</code></pre>
@@ -624,7 +636,7 @@ evaluated.</li>
 q1</code></pre>
 <pre><code>## &lt;quosure&gt;
 ## expr: ^x
-## env:  0x000002c4ac8adc00</code></pre>
+## env:  0x000001a557fd5b38</code></pre>
 <pre class="r"><code>#&gt; &lt;quosure&gt;
 #&gt; expr: ^x
 #&gt; env:  0x7fac62d19130
@@ -633,7 +645,7 @@ q2 &lt;- new_quosure(expr(x + !!q1), env(x = 10))
 q2</code></pre>
 <pre><code>## &lt;quosure&gt;
 ## expr: ^x + (^x)
-## env:  0x000002c4a6599c00</code></pre>
+## env:  0x000001a5581653a8</code></pre>
 <pre class="r"><code>#&gt; &lt;quosure&gt;
 #&gt; expr: ^x + (^x)
 #&gt; env:  0x7fac62e35a98
@@ -642,7 +654,7 @@ q3 &lt;- new_quosure(expr(x + !!q2), env(x = 100))
 q3</code></pre>
 <pre><code>## &lt;quosure&gt;
 ## expr: ^x + (^x + (^x))
-## env:  0x000002c4a68dc5a8</code></pre>
+## env:  0x000001a5584bc2b0</code></pre>
 <pre class="r"><code>#&gt; &lt;quosure&gt;
 #&gt; expr: ^x + (^x + (^x))
 #&gt; env:  0x7fac6302feb0</code></pre>

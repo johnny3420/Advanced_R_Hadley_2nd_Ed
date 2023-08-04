@@ -168,6 +168,18 @@ source2 <- function(path, env = caller_env()) {
   file <- paste(readLines(path, warn = FALSE), collapse = "\n")
   exprs <- parse_exprs(file)
 
+  res <- NULL
+  for (i in seq_along(exprs)) {
+    res <- eval(exprs[[i]], env)
+  }
+
+  invisible(res)
+}
+
+source2 <- function(path, env = caller_env()) {
+  file <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  exprs <- parse_exprs(file)
+
   res <- map(exprs, eval, env)
 
   invisible(res)
