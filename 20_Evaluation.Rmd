@@ -130,17 +130,50 @@ lobstr::ast(f)
 
 1. Carefully read the documentation for `source()`. What environment does it use by default? What if you supply `local = TRUE`? How do you provide a custom environment?
 
+Uses global with local = FALSE. With TRUE is uses the environment in which source is called. Or you can provide an environment to local instead of T or F
+
 2. Predict the results of the following lines of code:
 
 ```{r}
 eval(expr(eval(expr(eval(expr(2 + 2))))))
+# 4
 eval(eval(expr(eval(expr(eval(expr(2 + 2)))))))
+# 4
 expr(eval(expr(eval(expr(eval(expr(2 + 2)))))))
+# Since outer most call is expr
+# eval(expr(eval(expr(eval(expr(2 + 2)))))))
 ```
 
 3. Fill in the function bodies below to re-implement `get()` using `sym()` and `eval()`, and `assign()` using `sym()`, `expr()`, and `eval()`. Don’t worry about the multiple ways of choosing an environment that `get()` and `assign()` support; assume that the user supplies it explicitly.
 
+```{r}
+new_get <- function(name, env) {
+  eval(expr = sym(name), envir = env)
+}
+new_assign <- function(name, value, env){
+  eval(expr = expr(!!sym(name) <- !!value), envir = env)
+}
+
+new_get("x", env = .GlobalEnv)
+
+new_assign("a", value = 420, .GlobalEnv)
+new_get("a", env = .GlobalEnv)
+```
+
+
 4. Modify `source2()` so it returns the result of every expression, not just the last one. Can you eliminate the for loop?
+
+```{r}
+source2 <- function(path, env = caller_env()) {
+  file <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  exprs <- parse_exprs(file)
+
+  res <- map(exprs, eval, env)
+
+  invisible(res)
+}
+```
+
 
 5. We can make `base::local()` slightly easier to understand by spreading out over multiple lines:
 
@@ -152,6 +185,8 @@ local3 <- function(expr, envir = new.env()) {
 ```
 
 Explain how `local()` works in words. (Hint: you might want to `print(call)` to help understand what `substitute()` is doing, and read the documentation to remind yourself what environment `new.env()` will inherit from.)
+
+First a call to eval because it's inside of substitute, then it substitutes and then evals the new call in the caller environment
 
 ## 20.3 Quosures
 
@@ -273,9 +308,24 @@ q3
 ```
 
 ```{r}
-
+eval_tidy(q1)
+# 1
+eval_tidy(q2)
+#11
+eval_tidy(q3)
+#111
 ```
+It's all nested shit
 
 2. Write an `enenv()` function that captures the environment associated with an argument. (Hint: this should only require two function calls.)
+
+```{r}
+enenv <- function(x){
+  get_env(enquo(x))
+}
+
+enenv(a)
+```
+
 
 ## 20.4 Data masks
