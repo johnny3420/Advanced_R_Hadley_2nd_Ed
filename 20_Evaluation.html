@@ -552,7 +552,7 @@ foo(a + b)</code></pre>
 <pre class="r"><code>new_quosure(expr(x + y), env(x = 1, y = 10))</code></pre>
 <pre><code>## &lt;quosure&gt;
 ## expr: ^x + y
-## env:  0x000001a5584e8d60</code></pre>
+## env:  0x0000028e8ed10100</code></pre>
 </div>
 <div id="evaluating" class="section level3">
 <h3>20.3.2 Evaluating</h3>
@@ -583,7 +583,7 @@ qs</code></pre>
 ## $f
 ## &lt;quosure&gt;
 ## expr: ^x
-## env:  0x000001a558cd1198</code></pre>
+## env:  0x0000028e8f52ec28</code></pre>
 <pre class="r"><code>map_dbl(qs, eval_tidy)</code></pre>
 <pre><code>## global      f 
 ##      0      1</code></pre>
@@ -636,7 +636,7 @@ evaluated.</li>
 q1</code></pre>
 <pre><code>## &lt;quosure&gt;
 ## expr: ^x
-## env:  0x000001a557fd5b38</code></pre>
+## env:  0x0000028e943e4310</code></pre>
 <pre class="r"><code>#&gt; &lt;quosure&gt;
 #&gt; expr: ^x
 #&gt; env:  0x7fac62d19130
@@ -645,7 +645,7 @@ q2 &lt;- new_quosure(expr(x + !!q1), env(x = 10))
 q2</code></pre>
 <pre><code>## &lt;quosure&gt;
 ## expr: ^x + (^x)
-## env:  0x000001a5581653a8</code></pre>
+## env:  0x0000028e945591d0</code></pre>
 <pre class="r"><code>#&gt; &lt;quosure&gt;
 #&gt; expr: ^x + (^x)
 #&gt; env:  0x7fac62e35a98
@@ -654,7 +654,7 @@ q3 &lt;- new_quosure(expr(x + !!q2), env(x = 100))
 q3</code></pre>
 <pre><code>## &lt;quosure&gt;
 ## expr: ^x + (^x + (^x))
-## env:  0x000001a5584bc2b0</code></pre>
+## env:  0x0000028e8ecbb1b8</code></pre>
 <pre class="r"><code>#&gt; &lt;quosure&gt;
 #&gt; expr: ^x + (^x + (^x))
 #&gt; env:  0x7fac6302feb0</code></pre>
@@ -683,6 +683,322 @@ enenv(a)</code></pre>
 </div>
 <div id="data-masks" class="section level2">
 <h2>20.4 Data masks</h2>
+<div id="basics" class="section level3">
+<h3>20.4.1 Basics</h3>
+<pre class="r"><code>q1 &lt;- new_quosure(expr(x * y), env(x = 100))
+df &lt;- data.frame(y = 1:10)
+
+eval_tidy(q1, df)</code></pre>
+<pre><code>##  [1]  100  200  300  400  500  600  700  800  900 1000</code></pre>
+<pre class="r"><code>with2 &lt;- function(data, expr) {
+  expr &lt;- enquo(expr)
+  eval_tidy(expr, data)
+}</code></pre>
+<pre class="r"><code>x &lt;- 100
+with2(df, x * y)</code></pre>
+<pre><code>##  [1]  100  200  300  400  500  600  700  800  900 1000</code></pre>
+<pre class="r"><code>with3 &lt;- function(data, expr) {
+  expr &lt;- substitute(expr)
+  eval(expr, data, caller_env())
+}</code></pre>
+</div>
+<div id="pronouns" class="section level3">
+<h3>20.4.2 Pronouns</h3>
+<pre class="r"><code>with2(df, x)</code></pre>
+<pre><code>## [1] 100</code></pre>
+<pre class="r"><code>x &lt;- 1
+df &lt;- data.frame(x = 2)
+
+with2(df, .data$x)</code></pre>
+<pre><code>## [1] 2</code></pre>
+<pre class="r"><code>with2(df, .env$x)</code></pre>
+<pre><code>## [1] 1</code></pre>
+<pre class="r"><code>with2(df, .data$y)</code></pre>
+<pre><code>## Error in `.data$y`:
+## ! Column `y` not found in `.data`.</code></pre>
+</div>
+<div id="application-subset" class="section level3">
+<h3>20.4.3 Application: <code>subset()</code></h3>
+<pre class="r"><code>sample_df &lt;- data.frame(a = 1:5, b = 5:1, c = c(5, 3, 1, 4, 1))
+
+# Shorthand for sample_df[sample_df$a &gt;= 4, ]
+subset(sample_df, a &gt;= 4)</code></pre>
+<pre><code>##   a b c
+## 4 4 2 4
+## 5 5 1 1</code></pre>
+<pre class="r"><code># Shorthand for sample_df[sample_df$b == sample_df$c, ]
+subset(sample_df, b == c)</code></pre>
+<pre><code>##   a b c
+## 1 1 5 5
+## 5 5 1 1</code></pre>
+<pre class="r"><code>subset2 &lt;- function(data, rows) {
+  rows &lt;- enquo(rows)
+  rows_val &lt;- eval_tidy(rows, data)
+  stopifnot(is.logical(rows_val))
+
+  data[rows_val, , drop = FALSE]
+}
+
+subset2(sample_df, b == c)</code></pre>
+<pre><code>##   a b c
+## 1 1 5 5
+## 5 5 1 1</code></pre>
+</div>
+<div id="application-transform" class="section level3">
+<h3>20.4.4 Application: transform</h3>
+<pre class="r"><code>df &lt;- data.frame(x = c(2, 3, 1), y = runif(3))
+transform(df, x = -x, y2 = 2 * y)</code></pre>
+<pre><code>##    x         y        y2
+## 1 -2 0.7884051 1.5768103
+## 2 -3 0.3706549 0.7413097
+## 3 -1 0.4130947 0.8261894</code></pre>
+<pre class="r"><code>transform2 &lt;- function(.data, ...) {
+  dots &lt;- enquos(...)
+
+  for (i in seq_along(dots)) {
+    name &lt;- names(dots)[[i]]
+    dot &lt;- dots[[i]]
+
+    .data[[name]] &lt;- eval_tidy(dot, .data)
+  }
+
+  .data
+}
+
+transform2(df, x2 = x * 2, y = -y)</code></pre>
+<pre><code>##   x          y x2
+## 1 2 -0.7884051  4
+## 2 3 -0.3706549  6
+## 3 1 -0.4130947  2</code></pre>
+</div>
+<div id="application-select" class="section level3">
+<h3>20.4.5 Application: <code>select()</code></h3>
+<pre class="r"><code>df &lt;- data.frame(a = 1, b = 2, c = 3, d = 4, e = 5)
+subset(df, select = b:d)</code></pre>
+<pre><code>##   b c d
+## 1 2 3 4</code></pre>
+<pre class="r"><code>vars &lt;- as.list(set_names(seq_along(df), names(df)))
+str(vars)</code></pre>
+<pre><code>## List of 5
+##  $ a: int 1
+##  $ b: int 2
+##  $ c: int 3
+##  $ d: int 4
+##  $ e: int 5</code></pre>
+<pre class="r"><code>select2 &lt;- function(data, ...) {
+  dots &lt;- enquos(...)
+
+  vars &lt;- as.list(set_names(seq_along(data), names(data)))
+  cols &lt;- unlist(map(dots, eval_tidy, vars))
+
+  data[, cols, drop = FALSE]
+}
+select2(df, b:d)</code></pre>
+<pre><code>##   b c d
+## 1 2 3 4</code></pre>
+</div>
+<div id="exercises-2" class="section level3">
+<h3>20.4.6 Exercises</h3>
+<ol style="list-style-type: decimal">
+<li>Why did I use a for loop in transform2() instead of map()? Consider
+<code>transform2(df, x = x * 2, x = x * 2)</code>.</li>
+</ol>
+<pre class="r"><code>df &lt;- data.frame(x = c(2, 3, 1), y = runif(3))
+transform2 &lt;- function(.data, ...) {
+  dots &lt;- enquos(...)
+
+  for (i in seq_along(dots)) {
+    name &lt;- names(dots)[[i]]
+    dot &lt;- dots[[i]]
+
+    .data[[name]] &lt;- eval_tidy(dot, .data)
+  }
+
+  .data
+}
+
+transform2(df, x2 = x * 2, y = -y)</code></pre>
+<pre><code>##   x          y x2
+## 1 2 -0.9908300  4
+## 2 3 -0.5020595  6
+## 3 1 -0.9631125  2</code></pre>
+<pre class="r"><code>transform2(df, x = x * 2, x = x * 2)</code></pre>
+<pre><code>##    x         y
+## 1  8 0.9908300
+## 2 12 0.5020595
+## 3  4 0.9631125</code></pre>
+<pre class="r"><code>transform2(df, x2 = x * 2, x3 = x2 * 2)</code></pre>
+<pre><code>##   x         y x2 x3
+## 1 2 0.9908300  4  8
+## 2 3 0.5020595  6 12
+## 3 1 0.9631125  2  4</code></pre>
+<pre class="r"><code>transform3 &lt;- function(.data, ...) {
+  dots &lt;- enquos(...)
+  map(dots, eval_tidy, .data)
+}
+
+transform3(df, x2 = x * 2, y = -y)</code></pre>
+<pre><code>## $x2
+## [1] 4 6 2
+## 
+## $y
+## [1] -0.9908300 -0.5020595 -0.9631125</code></pre>
+<pre class="r"><code>transform3(df, x = x * 2, x = x * 2)</code></pre>
+<pre><code>## $x
+## [1] 4 6 2
+## 
+## $x
+## [1] 4 6 2</code></pre>
+<pre class="r"><code>transform3(df, x2 = x * 2, x3 = x2 * 2)</code></pre>
+<pre><code>## Error in `map()`:
+## ℹ In index: 2.
+## ℹ With name: x3.
+## Caused by error:
+## ! object &#39;x2&#39; not found</code></pre>
+<p>Each operation is done in order. This allows your changes to x to be
+used in the next call which uses x in the chain of transformations. map
+doesn’t allow for this since each is handled independently</p>
+<ol start="2" style="list-style-type: decimal">
+<li>Here’s an alternative implementation of <code>subset2()</code>:</li>
+</ol>
+<p>Compare and contrast <code>subset3()</code> to
+<code>subset2()</code>. What are its advantages and disadvantages?</p>
+<pre class="r"><code>#Orignal
+subset2 &lt;- function(data, rows) {
+  rows &lt;- enquo(rows)
+  rows_val &lt;- eval_tidy(rows, data)
+  stopifnot(is.logical(rows_val))
+
+  data[rows_val, , drop = FALSE]
+}
+
+#New
+subset3 &lt;- function(data, rows) {
+  rows &lt;- enquo(rows)
+  eval_tidy(expr(data[!!rows, , drop = FALSE]), data = data)
+}
+
+df &lt;- data.frame(x = 1:3)
+subset2(df, x == 1)</code></pre>
+<pre><code>##   x
+## 1 1</code></pre>
+<pre class="r"><code>subset3(df, x == 1)</code></pre>
+<pre><code>##   x
+## 1 1</code></pre>
+<p>Both work, definitely more error checking in the first function.</p>
+<ol start="3" style="list-style-type: decimal">
+<li>The following function implements the basics of
+<code>dplyr::arrange()</code>. Annotate each line with a comment
+explaining what it does. Can you explain why !!.na.last is strictly
+correct, but omitting the !! is unlikely to cause problems?</li>
+</ol>
+<pre class="r"><code>arrange2 &lt;- function(.df, ..., .na.last = TRUE) {
+  args &lt;- enquos(...) # get the arguments for ordering the rows
+
+  order_call &lt;- expr(order(!!!args, na.last = !!.na.last))
+
+  ord &lt;- eval_tidy(order_call, .df)
+  stopifnot(length(ord) == nrow(.df))
+
+  .df[ord, , drop = FALSE]
+}</code></pre>
+</div>
+</div>
+<div id="using-tidy-evaluation" class="section level2">
+<h2>20.5 Using tidy evaluation</h2>
+<div id="quoting-and-unquoting" class="section level3">
+<h3>20.5.1 Quoting and unquoting</h3>
+<pre class="r"><code>resample &lt;- function(df, n) {
+  idx &lt;- sample(nrow(df), n, replace = TRUE)
+  df[idx, , drop = FALSE]
+}</code></pre>
+<pre class="r"><code>subsample &lt;- function(df, cond, n = nrow(df)) {
+  df &lt;- subset2(df, cond)
+  resample(df, n) # this n can
+}
+rm(x)
+df &lt;- data.frame(x = c(1, 1, 1, 2, 2), y = 1:5)
+subsample(df, x == 1)</code></pre>
+<pre><code>## Error in eval(expr, envir, enclos): object &#39;x&#39; not found</code></pre>
+<pre class="r"><code>subsample &lt;- function(df, cond, n = nrow(df)) {
+  cond &lt;- enquo(cond)
+
+  df &lt;- subset2(df, !!cond)
+  resample(df, n)
+}
+
+subsample(df, x == 1)</code></pre>
+<pre><code>##     x y
+## 3   1 3
+## 3.1 1 3
+## 2   1 2</code></pre>
+</div>
+<div id="handling-ambiguity" class="section level3">
+<h3>20.5.2 Handling ambiguity</h3>
+<pre class="r"><code>threshold_x &lt;- function(df, val) {
+  subset2(df, x &gt;= val)
+}</code></pre>
+<pre class="r"><code>x &lt;- 10
+no_x &lt;- data.frame(y = 1:3)
+threshold_x(no_x, 2)</code></pre>
+<pre><code>##   y
+## 1 1
+## 2 2
+## 3 3</code></pre>
+<pre class="r"><code>has_val &lt;- data.frame(x = 1:3, val = 9:11)
+threshold_x(has_val, 2)</code></pre>
+<pre><code>## [1] x   val
+## &lt;0 rows&gt; (or 0-length row.names)</code></pre>
+<pre class="r"><code>threshold_x &lt;- function(df, val) {
+  subset2(df, .data$x &gt;= .env$val)
+}
+
+x &lt;- 10
+threshold_x(no_x, 2)</code></pre>
+<pre><code>## Error in `.data$x`:
+## ! Column `x` not found in `.data`.</code></pre>
+<pre class="r"><code>#&gt; Error: Column `x` not found in `.data`
+threshold_x(has_val, 2)</code></pre>
+<pre><code>##   x val
+## 2 2  10
+## 3 3  11</code></pre>
+<pre class="r"><code>threshold_x &lt;- function(df, val) {
+  subset2(df, .data$x &gt;= !!val)
+}</code></pre>
+</div>
+<div id="quoting-and-ambiguity" class="section level3">
+<h3>20.5.3 Quoting and ambiguity</h3>
+<pre class="r"><code>threshold_var &lt;- function(df, var, val) {
+  var &lt;- as_string(ensym(var))
+  subset2(df, .data[[var]] &gt;= !!val)
+}
+
+df &lt;- data.frame(x = 1:10)
+threshold_var(df, x, 8)</code></pre>
+<pre><code>##     x
+## 8   8
+## 9   9
+## 10 10</code></pre>
+<pre class="r"><code>threshold_expr &lt;- function(df, expr, val) {
+  expr &lt;- enquo(expr)
+  subset2(df, !!expr &gt;= !!val)
+}</code></pre>
+</div>
+<div id="exercises-3" class="section level3">
+<h3>20.5.4 Exercises</h3>
+<ol style="list-style-type: decimal">
+<li>I’ve included an alternative implementation of
+<code>threshold_var()</code> below. What makes it different to the
+approach I used above? What makes it harder?</li>
+</ol>
+<pre class="r"><code>threshold_var &lt;- function(df, var, val) {
+  var &lt;- ensym(var)
+  subset2(df, `$`(.data, !!var) &gt;= !!val)
+}</code></pre>
+</div>
+</div>
+<div id="base-evaluation" class="section level2">
+<h2>20.6 Base evaluation</h2>
 </div>
 
 

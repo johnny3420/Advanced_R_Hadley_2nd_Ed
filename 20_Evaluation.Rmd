@@ -341,3 +341,297 @@ enenv(a)
 
 
 ## 20.4 Data masks
+### 20.4.1 Basics
+
+```{r}
+q1 <- new_quosure(expr(x * y), env(x = 100))
+df <- data.frame(y = 1:10)
+
+eval_tidy(q1, df)
+```
+
+```{r}
+with2 <- function(data, expr) {
+  expr <- enquo(expr)
+  eval_tidy(expr, data)
+}
+```
+
+```{r}
+x <- 100
+with2(df, x * y)
+```
+
+```{r}
+with3 <- function(data, expr) {
+  expr <- substitute(expr)
+  eval(expr, data, caller_env())
+}
+```
+
+### 20.4.2 Pronouns
+
+```{r}
+with2(df, x)
+```
+
+```{r}
+x <- 1
+df <- data.frame(x = 2)
+
+with2(df, .data$x)
+
+with2(df, .env$x)
+```
+
+```{r, error=TRUE}
+with2(df, .data$y)
+```
+
+### 20.4.3 Application: `subset()`
+
+```{r}
+sample_df <- data.frame(a = 1:5, b = 5:1, c = c(5, 3, 1, 4, 1))
+
+# Shorthand for sample_df[sample_df$a >= 4, ]
+subset(sample_df, a >= 4)
+
+
+# Shorthand for sample_df[sample_df$b == sample_df$c, ]
+subset(sample_df, b == c)
+```
+
+```{r}
+subset2 <- function(data, rows) {
+  rows <- enquo(rows)
+  rows_val <- eval_tidy(rows, data)
+  stopifnot(is.logical(rows_val))
+
+  data[rows_val, , drop = FALSE]
+}
+
+subset2(sample_df, b == c)
+```
+
+### 20.4.4 Application: transform
+```{r}
+df <- data.frame(x = c(2, 3, 1), y = runif(3))
+transform(df, x = -x, y2 = 2 * y)
+```
+
+```{r}
+transform2 <- function(.data, ...) {
+  dots <- enquos(...)
+
+  for (i in seq_along(dots)) {
+    name <- names(dots)[[i]]
+    dot <- dots[[i]]
+
+    .data[[name]] <- eval_tidy(dot, .data)
+  }
+
+  .data
+}
+
+transform2(df, x2 = x * 2, y = -y)
+```
+
+### 20.4.5 Application: `select()`
+
+```{r}
+df <- data.frame(a = 1, b = 2, c = 3, d = 4, e = 5)
+subset(df, select = b:d)
+```
+
+```{r}
+vars <- as.list(set_names(seq_along(df), names(df)))
+str(vars)
+```
+
+```{r}
+select2 <- function(data, ...) {
+  dots <- enquos(...)
+
+  vars <- as.list(set_names(seq_along(data), names(data)))
+  cols <- unlist(map(dots, eval_tidy, vars))
+
+  data[, cols, drop = FALSE]
+}
+select2(df, b:d)
+```
+
+### 20.4.6 Exercises
+1. Why did I use a for loop in transform2() instead of map()? Consider `transform2(df, x = x * 2, x = x * 2)`.
+
+```{r, error=TRUE}
+df <- data.frame(x = c(2, 3, 1), y = runif(3))
+transform2 <- function(.data, ...) {
+  dots <- enquos(...)
+
+  for (i in seq_along(dots)) {
+    name <- names(dots)[[i]]
+    dot <- dots[[i]]
+
+    .data[[name]] <- eval_tidy(dot, .data)
+  }
+
+  .data
+}
+
+transform2(df, x2 = x * 2, y = -y)
+transform2(df, x = x * 2, x = x * 2)
+transform2(df, x2 = x * 2, x3 = x2 * 2)
+
+transform3 <- function(.data, ...) {
+  dots <- enquos(...)
+  map(dots, eval_tidy, .data)
+}
+
+transform3(df, x2 = x * 2, y = -y)
+transform3(df, x = x * 2, x = x * 2)
+transform3(df, x2 = x * 2, x3 = x2 * 2)
+```
+
+Each operation is done in order. This allows your changes to x to be used in the next call which uses x in the chain of transformations. map doesn't allow for this since each is handled independently
+
+2. Here’s an alternative implementation of `subset2()`:
+
+Compare and contrast `subset3()` to `subset2()`. What are its advantages and disadvantages?
+
+
+```{r}
+#Orignal
+subset2 <- function(data, rows) {
+  rows <- enquo(rows)
+  rows_val <- eval_tidy(rows, data)
+  stopifnot(is.logical(rows_val))
+
+  data[rows_val, , drop = FALSE]
+}
+
+#New
+subset3 <- function(data, rows) {
+  rows <- enquo(rows)
+  eval_tidy(expr(data[!!rows, , drop = FALSE]), data = data)
+}
+
+df <- data.frame(x = 1:3)
+subset2(df, x == 1)
+subset3(df, x == 1)
+```
+
+Both work, definitely more error checking in the first function.
+
+3. The following function implements the basics of `dplyr::arrange()`. Annotate each line with a comment explaining what it does. Can you explain why !!.na.last is strictly correct, but omitting the !! is unlikely to cause problems?
+
+```{r}
+arrange2 <- function(.df, ..., .na.last = TRUE) {
+  args <- enquos(...) # get the arguments for ordering the rows
+
+  order_call <- expr(order(!!!args, na.last = !!.na.last))
+
+  ord <- eval_tidy(order_call, .df)
+  stopifnot(length(ord) == nrow(.df))
+
+  .df[ord, , drop = FALSE]
+}
+```
+
+## 20.5 Using tidy evaluation
+
+### 20.5.1 Quoting and unquoting
+```{r}
+resample <- function(df, n) {
+  idx <- sample(nrow(df), n, replace = TRUE)
+  df[idx, , drop = FALSE]
+}
+```
+
+```{r, error=TRUE}
+subsample <- function(df, cond, n = nrow(df)) {
+  df <- subset2(df, cond)
+  resample(df, n) # this n can
+}
+rm(x)
+df <- data.frame(x = c(1, 1, 1, 2, 2), y = 1:5)
+subsample(df, x == 1)
+```
+
+```{r}
+subsample <- function(df, cond, n = nrow(df)) {
+  cond <- enquo(cond)
+
+  df <- subset2(df, !!cond)
+  resample(df, n)
+}
+
+subsample(df, x == 1)
+```
+
+### 20.5.2 Handling ambiguity
+
+```{r}
+threshold_x <- function(df, val) {
+  subset2(df, x >= val)
+}
+```
+
+```{r}
+x <- 10
+no_x <- data.frame(y = 1:3)
+threshold_x(no_x, 2)
+```
+
+```{r}
+has_val <- data.frame(x = 1:3, val = 9:11)
+threshold_x(has_val, 2)
+```
+
+```{r, error = TRUE}
+threshold_x <- function(df, val) {
+  subset2(df, .data$x >= .env$val)
+}
+
+x <- 10
+threshold_x(no_x, 2)
+#> Error: Column `x` not found in `.data`
+threshold_x(has_val, 2)
+```
+
+```{r}
+threshold_x <- function(df, val) {
+  subset2(df, .data$x >= !!val)
+}
+```
+
+### 20.5.3 Quoting and ambiguity
+
+```{r}
+threshold_var <- function(df, var, val) {
+  var <- as_string(ensym(var))
+  subset2(df, .data[[var]] >= !!val)
+}
+
+df <- data.frame(x = 1:10)
+threshold_var(df, x, 8)
+```
+
+```{r}
+threshold_expr <- function(df, expr, val) {
+  expr <- enquo(expr)
+  subset2(df, !!expr >= !!val)
+}
+```
+
+### 20.5.4 Exercises
+
+1. I’ve included an alternative implementation of `threshold_var()` below. What makes it different to the approach I used above? What makes it harder?
+
+```{r}
+threshold_var <- function(df, var, val) {
+  var <- ensym(var)
+  subset2(df, `$`(.data, !!var) >= !!val)
+}
+```
+
+## 20.6 Base evaluation
