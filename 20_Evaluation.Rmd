@@ -520,22 +520,26 @@ subset2(df, x == 1)
 subset3(df, x == 1)
 ```
 
-Both work, definitely more error checking in the first function.
+Both work, definitely more error checking in the first function. Second does the subsetting in the context of the data mask since they are in the same call. Second is also harder to read. Can run into issues if there is a column called data.
 
 3. The following function implements the basics of `dplyr::arrange()`. Annotate each line with a comment explaining what it does. Can you explain why !!.na.last is strictly correct, but omitting the !! is unlikely to cause problems?
 
 ```{r}
 arrange2 <- function(.df, ..., .na.last = TRUE) {
-  args <- enquos(...) # get the arguments for ordering the rows
-
+  # get the arguments and order for ordering the rows
+  args <- enquos(...) 
+  # splice unquote the args into order along with how to treat NAs
   order_call <- expr(order(!!!args, na.last = !!.na.last))
-
+  # Create the index for subsetting the data frame into the new order
   ord <- eval_tidy(order_call, .df)
+  # Make sure the vector of indexes is the same length as the original data frame, meaning now rows were dropped.
   stopifnot(length(ord) == nrow(.df))
-
+  # reorder the data frame using subsetting and the new ordering indices
   .df[ord, , drop = FALSE]
 }
 ```
+
+
 
 ## 20.5 Using tidy evaluation
 
@@ -628,10 +632,250 @@ threshold_expr <- function(df, expr, val) {
 1. I’ve included an alternative implementation of `threshold_var()` below. What makes it different to the approach I used above? What makes it harder?
 
 ```{r}
+# Old
+threshold_var <- function(df, var, val) {
+  var <- as_string(ensym(var))
+  subset2(df, .data[[var]] >= !!val)
+}
+
+# New
 threshold_var <- function(df, var, val) {
   var <- ensym(var)
   subset2(df, `$`(.data, !!var) >= !!val)
 }
 ```
 
+
+var no longer is wrapped with "as_string". Subsetting is now done using `$` in the prefix form. It overall is uglier to look at
+
 ## 20.6 Base evaluation
+### 20.6.1 `substitute()`
+
+```{r}
+subset_base <- function(data, rows) {
+  rows <- substitute(rows)
+  rows_val <- eval(rows, data, caller_env())
+  stopifnot(is.logical(rows_val))
+
+  data[rows_val, , drop = FALSE]
+}
+
+subset_tidy <- function(data, rows) {
+  rows <- enquo(rows)
+  rows_val <- eval_tidy(rows, data)
+  stopifnot(is.logical(rows_val))
+
+  data[rows_val, , drop = FALSE]
+}
+```
+
+#### 20.6.1.1 Programming with `subset()`
+
+```{r}
+f1 <- function(df, ...) {
+  xval <- 3
+  subset_base(df, ...)
+}
+
+my_df <- data.frame(x = 1:3, y = 3:1)
+xval <- 1
+f1(my_df, x == xval)
+```
+
+```{r, error = TRUE}
+local({
+  zzz <- 2
+  dfs <- list(data.frame(x = 1:3), data.frame(x = 4:6))
+  lapply(dfs, subset_base, x == zzz)
+})
+```
+
+```{r}
+f2 <- function(df1, expr) {
+  call <- substitute(subset_base(df1, expr))
+  expr_print(call)
+  eval(call, caller_env())
+}
+
+my_df <- data.frame(x = 1:3, y = 3:1)
+f2(my_df, x == 1)
+```
+
+```{r}
+f3 <- function(df) {
+  call <- substitute(subset_base(df, z > 0))
+  expr_print(call)
+  eval(call, caller_env())
+}
+
+my_df <- data.frame(x = 1:3, y = 3:1)
+z <- -1
+f3(my_df)
+```
+
+
+#### 20.6.1.2 What about `[`?
+
+Need to set drop = FALSE, and remove NAs if using ]
+
+### 20.6.2 `match.call()`
+
+```{r}
+g <- function(x, y, z) {
+  match.call()
+}
+g(1, 2, z = 3)
+```
+
+```{r, eval = FALSE}
+write.csv <- function(...) {
+  call <- match.call(write.table, expand.dots = TRUE)
+
+  call[[1]] <- quote(write.table)
+  call$sep <- ","
+  call$dec <- "."
+
+  eval(call, parent.frame())
+}
+```
+
+```{r, eval = FALSE}
+write.csv <- function(...) {
+  write.table(..., sep = ",", dec = ".")
+}
+```
+
+#### 20.6.2.1 Wrapping modelling functions
+
+```{r}
+lm2 <- function(formula, data) {
+  lm(formula, data)
+}
+```
+
+```{r}
+lm2(mpg ~ disp, mtcars)
+```
+
+```{r}
+lm3 <- function(formula, data, env = caller_env()) {
+  formula <- enexpr(formula)
+  data <- enexpr(data)
+
+  lm_call <- expr(lm(!!formula, data = !!data))
+  expr_print(lm_call)
+  eval(lm_call, env)
+}
+
+lm3(mpg ~ disp, mtcars)
+```
+
+```{r}
+resp <- expr(mpg)
+disp1 <- expr(vs)
+disp2 <- expr(wt)
+lm3(!!resp ~ !!disp1 + !!disp2, mtcars)
+```
+
+#### 20.6.2.2 Evaluation environment
+
+```{r, error = TRUE}
+resample_lm0 <- function(formula, data, env = caller_env()) {
+  formula <- enexpr(formula)
+  resample_data <- resample(data, n = nrow(data))
+
+  lm_call <- expr(lm(!!formula, data = resample_data))
+  expr_print(lm_call)
+  eval(lm_call, env)
+}
+
+df <- data.frame(x = 1:10, y = 5 + 3 * (1:10) + round(rnorm(10), 2))
+resample_lm0(y ~ x, data = df)
+```
+
+```{r}
+resample_lm1 <- function(formula, data, env = caller_env()) {
+  formula <- enexpr(formula)
+  resample_data <- resample(data, n = nrow(data))
+
+  lm_call <- expr(lm(!!formula, data = !!resample_data))
+  expr_print(lm_call)
+  eval(lm_call, env)
+}
+resample_lm1(y ~ x, data = df)$call
+```
+
+```{r}
+resample_lm2 <- function(formula, data, env = caller_env()) {
+  formula <- enexpr(formula)
+  resample_data <- resample(data, n = nrow(data))
+
+  lm_env <- env(env, resample_data = resample_data)
+  lm_call <- expr(lm(!!formula, data = resample_data))
+  expr_print(lm_call)
+  eval(lm_call, lm_env)
+}
+resample_lm2(y ~ x, data = df)
+```
+
+### 20.6.3 Exercises
+
+1. Why does this function fail?
+
+```{r, error = TRUE}
+lm3a <- function(formula, data) {
+  formula <- enexpr(formula)
+
+  lm_call <- expr(lm(!!formula, data = data))
+  eval(lm_call, caller_env())
+}
+lm3a(mpg ~ disp, mtcars)$call
+
+#Need to unquote data in the expr call
+
+lm3a <- function(formula, data) {
+  formula <- enexpr(formula)
+
+  lm_call <- expr(lm(!!formula, data = !!data))
+  eval(lm_call, caller_env())
+}
+lm3a(mpg ~ disp, mtcars)$call
+```
+
+2. When model building, typically the response and data are relatively constant while you rapidly experiment with different predictors. Write a small wrapper that allows you to reduce duplication in the code below.
+
+```{r}
+lm(mpg ~ disp, data = mtcars)
+lm(mpg ~ I(1 / disp), data = mtcars)
+lm(mpg ~ disp * cyl, data = mtcars)
+
+new_lm <- function(predictors, env = caller_env()){
+  predictors <- enexpr(predictors)
+  data <- enexpr(data)
+  
+  lm_call <- expr(lm(mpg ~ !!predictors, data = mtcars))
+  expr_print(lm_call)
+  eval(lm_call, env)
+}
+
+lm(mpg ~ disp, data = mtcars)
+new_lm(disp)
+
+lm(mpg ~ I(1 / disp), data = mtcars)
+new_lm(I(1 / disp))
+
+lm(mpg ~ disp * cyl, data = mtcars)
+new_lm(disp * cyl)
+```
+
+3. Another way to write `resample_lm()` would be to include the resample expression (`data[sample(nrow(data), replace = TRUE), , drop = FALSE]`) in the data argument. Implement that approach. What are the advantages? What are the disadvantages?
+
+```{r}
+df <- data.frame(x = 1:10, y = 5 + 3 * (1:10) + round(rnorm(10), 2))
+resample_lm2(y ~ x, data = df)
+resample_lm2(y ~ x, data = df[sample(nrow(df), replace = TRUE), , drop = FALSE])
+```
+
+Advantage: No need to create a new environment for the new data frame or the need to unquote it
+
+Disadvantage: It's quite cumbersome for multiple calls. It also is hard coded for each call. Capturing becomes worse.
