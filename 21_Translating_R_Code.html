@@ -585,6 +585,181 @@ void_tags &lt;- c(&quot;area&quot;, &quot;base&quot;, &quot;br&quot;, &quot;col&
 </div>
 <div id="exercises" class="section level3">
 <h3>21.2.6 Exercises</h3>
+<ol style="list-style-type: decimal">
+<li>The escaping rules for <code>&lt;script&gt;</code> tags are
+different because they contain JavaScript, not HTML. Instead of escaping
+angle brackets or ampersands, you need to escape
+<code>&lt;/script&gt;</code> so that the tag isn’t closed too early. For
+example, <code>script(&quot;&#39;&lt;/script&gt;&#39;&quot;)</code>, shouldn’t generate
+this:</li>
+</ol>
+<p><code>&lt;script&gt;&#39;&lt;/script&gt;&#39;&lt;/script&gt;</code><br />
+But<br />
+<code>&lt;script&gt;&#39;&lt;\/script&gt;&#39;&lt;/script&gt;</code></p>
+<p>Adapt the <code>escape()</code> to follow these rules when a new
+argument script is set to TRUE.</p>
+<pre class="r"><code>#Old
+html_tags$script(&quot;&#39;&lt;/script&gt;&#39;&quot;)</code></pre>
+<pre><code>## &lt;HTML&gt; &lt;script&gt;&#39;&amp;lt;/script&amp;gt;&#39;&lt;/script&gt;</code></pre>
+<pre class="r"><code>escape &lt;- function(x, script = FALSE) UseMethod(&quot;escape&quot;)
+escape.character &lt;- function(x, script = FALSE) {
+  if (script) {
+    x &lt;- gsub(&quot;&lt;/script&gt;&quot;, &quot;&lt;\\/script&gt;&quot;, x, fixed = TRUE)
+  } else {
+    x &lt;- gsub(&quot;&amp;&quot;, &quot;&amp;amp;&quot;, x)
+    x &lt;- gsub(&quot;&lt;&quot;, &quot;&amp;lt;&quot;, x)
+    x &lt;- gsub(&quot;&gt;&quot;, &quot;&amp;gt;&quot;, x)
+  }
+  
+  html(x)
+}
+
+escape.advr_html &lt;- function(x, script = FALSE) x
+
+
+tag &lt;- function(tag, script = FALSE) {
+  
+  new_function(
+    exprs(... = ),
+    expr({
+      dots &lt;- dots_partition(...)
+      attribs &lt;- html_attributes(dots$named)
+      children &lt;- map_chr(dots$unnamed, escape, script = !!script)
+      html(paste0(
+        !!paste0(&quot;&lt;&quot;, tag), attribs, &quot;&gt;&quot;,
+        paste(children, collapse = &quot;&quot;),
+        !!paste0(&quot;&lt;/&quot;, tag, &quot;&gt;&quot;)
+      ))
+    }),
+    caller_env()
+  )
+}
+
+html_tags$script &lt;- tag(&quot;script&quot;, script = TRUE)
+
+html_tags$script(&quot;&#39;&lt;/script&gt;&#39;&quot;)</code></pre>
+<pre><code>## &lt;HTML&gt; &lt;script&gt;&#39;&lt;\/script&gt;&#39;&lt;/script&gt;</code></pre>
+<ol start="2" style="list-style-type: decimal">
+<li>The use of <code>...</code> for all functions has some big
+downsides. There’s no input validation and there will be little
+information in the documentation or autocomplete about how they are used
+in the function. Create a new function that, when given a named list of
+tags and their attribute names (like below), creates tag functions with
+named arguments.</li>
+</ol>
+<pre class="r"><code>test_list &lt;- list(
+  a = c(&quot;href&quot;),
+  img = c(&quot;src&quot;, &quot;width&quot;, &quot;height&quot;)
+)
+
+entag &lt;-  function(tag, tag_attrs) {
+  attrs &lt;- c(&quot;class&quot;, &quot;id&quot;, tag_attrs)
+  
+  attr_args &lt;- set_names(rep(list(NULL), length(attrs)), attrs)
+  attr_list &lt;- call2(&quot;list&quot;,!!!syms(set_names(attrs)))
+  
+  new_function(exprs(... = ,!!!attr_args),
+               expr({
+                 ellipsis::check_dots_unnamed()
+                 
+                 attribs &lt;- html_attributes(compact(!!attr_list))
+                 dots &lt;- compact(list(...))
+                 children &lt;- map_chr(dots, escape)
+                 
+                 html(paste0(
+                   !!paste0(&quot;&lt;&quot;, tag),
+                   attribs,
+                   &quot;&gt;&quot;,
+                   paste(children, collapse = &quot;&quot;),!!paste0(&quot;&lt;/&quot;, tag, &quot;&gt;&quot;)
+                 ))
+               }))
+}
+
+tags &lt;- map2(names(test_list), unname(test_list), entag) %&gt;% 
+  set_names(names(test_list))
+
+with_tags &lt;- function(code) {
+  code &lt;- enquo(code)
+  eval_tidy(code, tags)
+}
+
+with_tags(
+  a(
+    img(&quot;Correct me if I am wrong&quot;, id = &quot;second&quot;),
+    href = &quot;https://github.com/Tazinho/Advanced-R-Solutions/issues&quot;,
+    id = &quot;first&quot;
+  )
+)</code></pre>
+<pre><code>## &lt;HTML&gt; &lt;a id=&#39;first&#39;
+## href=&#39;https://github.com/Tazinho/Advanced-R-Solutions/issues&#39;&gt;&lt;img
+## id=&#39;second&#39;&gt;Correct me if I am wrong&lt;/img&gt;&lt;/a&gt;</code></pre>
+<ol start="3" style="list-style-type: decimal">
+<li>Reason about the following code that calls <code>with_html()</code>
+referencing objects from the environment. Will it work or fail? Why? Run
+the code to verify your predictions.</li>
+</ol>
+<pre class="r"><code>greeting &lt;- &quot;Hello!&quot;
+with_html(p(greeting))</code></pre>
+<pre><code>## &lt;HTML&gt; &lt;p&gt;Hello!&lt;/p&gt;</code></pre>
+<pre class="r"><code># Will work since it is evaluated inside out
+
+p &lt;- function() &quot;p&quot;
+address &lt;- &quot;123 anywhere street&quot;
+with_html(p(address))</code></pre>
+<pre><code>## Error in `map_chr()`:
+## ℹ In index: 1.
+## Caused by error in `UseMethod()`:
+## ! no applicable method for &#39;escape&#39; applied to an object of class &quot;function&quot;</code></pre>
+<pre class="r"><code># Crash because address is a function in the html mask. without input the function is provided to p which causes an error</code></pre>
+<ol start="4" style="list-style-type: decimal">
+<li>Currently the HTML doesn’t look terribly pretty, and it’s hard to
+see the structure. How could you adapt tag() to do indenting and
+formatting? (You may need to do some research into block and inline
+tags.)</li>
+</ol>
+<pre class="r"><code>html &lt;- function(x) structure(x, class = &quot;advr_html&quot;)
+
+print.advr_html &lt;- function(x, ...) {
+  cat(paste(&quot;&lt;HTML&gt;&quot;, x, sep = &quot;\n&quot;))
+}
+
+indent &lt;- function(x) {
+  paste0(&quot;  &quot;, gsub(&quot;\n&quot;, &quot;\n  &quot;, x))
+}
+
+format_code &lt;- function(children, indent = FALSE) {
+  if (indent) {
+    paste0(&quot;\n&quot;, paste0(indent(children), collapse = &quot;\n&quot;), &quot;\n&quot;)
+  } else {
+    paste(children, collapse = &quot;&quot;) 
+  }
+}
+
+html_tags$body &lt;- function(...) {
+  dots &lt;- dots_partition(...)
+  attribs &lt;- html_attributes(dots$named)
+  children &lt;- map_chr(dots$unnamed, escape)
+  
+  html(paste0(
+    &quot;&lt;body&quot;, attribs, &quot;&gt;&quot;,
+    format_code(children, indent = TRUE),  
+    &quot;&lt;/body&gt;&quot;
+  ))
+}
+
+with_html(
+  body(
+    h1(&quot;A heading&quot;, id = &quot;first&quot;),
+    p(&quot;Some text &amp;&quot;, b(&quot;some bold text.&quot;)),
+    img(src = &quot;myimg.png&quot;, width = 100, height = 100)
+  )
+)</code></pre>
+<pre><code>## &lt;HTML&gt;
+## &lt;body&gt;
+##   &lt;h1 id=&#39;first&#39;&gt;A heading&lt;/h1&gt;
+##   &lt;p&gt;Some text &amp;amp;&lt;b&gt;some bold text.&lt;/b&gt;&lt;/p&gt;
+##   &lt;img src=&#39;myimg.png&#39; width=&#39;100&#39; height=&#39;100&#39; /&gt;
+## &lt;/body&gt;</code></pre>
 </div>
 </div>
 <div id="latex" class="section level2">
@@ -813,7 +988,7 @@ unknown_op(&quot;foo&quot;)</code></pre>
 ##     contents &lt;- paste(..., collapse = &quot;, &quot;)
 ##     paste0(&quot;\\mathrm{foo}(&quot;, contents, &quot;)&quot;)
 ## }
-## &lt;environment: 0x000001a7b850cb80&gt;</code></pre>
+## &lt;environment: 0x000001632bdd9298&gt;</code></pre>
 <pre class="r"><code>latex_env &lt;- function(expr) {
   calls &lt;- all_calls(expr)
   call_list &lt;- map(set_names(calls), unknown_op)
@@ -835,6 +1010,76 @@ unknown_op(&quot;foo&quot;)</code></pre>
 </div>
 <div id="exercises-1" class="section level3">
 <h3>21.3.8 Exercises</h3>
+<ol style="list-style-type: decimal">
+<li>Add escaping. The special symbols that should be escaped by adding a
+backslash in front of them are <code>\</code>, <code>$</code>, and
+<code>%</code>. Just as with HTML, you’ll need to make sure you don’t
+end up double-escaping. So you’ll need to create a small S3 class and
+then use that in function operators. That will also allow you to embed
+arbitrary LaTeX if needed.</li>
+</ol>
+<pre class="r"><code>to_math(`$`)</code></pre>
+<pre><code>## &lt;LATEX&gt; $</code></pre>
+<pre class="r"><code>to_math(a$b)</code></pre>
+<pre><code>## &lt;LATEX&gt; \mathrm{$}(a b)</code></pre>
+<pre class="r"><code>to_math(`%`)</code></pre>
+<pre><code>## &lt;LATEX&gt; %</code></pre>
+<pre class="r"><code>to_math(`\\`)</code></pre>
+<pre><code>## &lt;LATEX&gt; \</code></pre>
+<pre class="r"><code>escape_latex &lt;- function(x) UseMethod(&quot;escape_latex&quot;)
+
+escape_latex.character &lt;- function(x) {
+  x &lt;- gsub(&quot;^\\\\$&quot;, &quot;\\\\\\\\&quot;, x)
+  x &lt;- gsub(&quot;^\\$$&quot;, &quot;\\\\$&quot;, x)
+  x &lt;- gsub(&quot;^\\%$&quot;, &quot;\\\\%&quot;, x)
+  
+  latex(x)
+}
+
+escape_latex.advr_latex &lt;- function(x) x
+
+unknown_op &lt;- function(op) {
+  new_function(
+    exprs(... = ),
+    expr({
+      contents &lt;- paste(..., collapse = &quot;, &quot;)
+      paste0(
+        !!paste0(&quot;\\mathrm{&quot;, escape_latex(op), &quot;}(&quot;), contents, &quot;)&quot;
+      )
+    })
+  )
+}
+
+latex_env &lt;- function(expr) {
+  calls &lt;- all_calls(expr)
+  call_list &lt;- map(set_names(calls), unknown_op)
+  call_env &lt;- as_environment(call_list)
+  
+  # Known functions
+  f_env &lt;- env_clone(f_env, call_env)
+  
+  # Default symbols
+  names &lt;- all_names(expr)
+  symbol_env &lt;- as_environment(set_names(escape_latex(names), names),
+                               parent = f_env)
+  
+  # Known symbols
+  greek_env &lt;- env_clone(greek_env, parent = symbol_env)
+  greek_env
+}</code></pre>
+<pre class="r"><code>to_math(`$`)</code></pre>
+<pre><code>## &lt;LATEX&gt; \$</code></pre>
+<pre class="r"><code>to_math(a$b)</code></pre>
+<pre><code>## &lt;LATEX&gt; \mathrm{\$}(a b)</code></pre>
+<pre class="r"><code>to_math(`%`)</code></pre>
+<pre><code>## &lt;LATEX&gt; \%</code></pre>
+<pre class="r"><code>to_math(`\\`)</code></pre>
+<pre><code>## &lt;LATEX&gt; \\</code></pre>
+<ol start="2" style="list-style-type: decimal">
+<li>Complete the DSL to support all the functions that
+<code>plotmath</code> supports.</li>
+</ol>
+<p>No</p>
 </div>
 </div>
 
