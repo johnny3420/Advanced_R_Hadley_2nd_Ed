@@ -1,0 +1,187 @@
+---
+title: "23 Measuring performance"
+output: html_document
+date: "2023-09-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 23 Measuring performance
+## 23.1 Introduction
+
+```{r}
+library(tidyverse)
+library(profvis)
+library(bench)
+```
+
+## 23.2 Profiling
+
+```{r}
+f <- function() {
+  pause(0.1)
+  g()
+  h()
+}
+g <- function() {
+  pause(0.1)
+  h()
+}
+h <- function() {
+  pause(0.1)
+}
+```
+
+```{r}
+tmp <- tempfile()
+Rprof(tmp, interval = 0.1)
+f()
+Rprof(NULL)
+writeLines(readLines(tmp))
+```
+
+### 23.2.1 Visualising profiles
+
+```{r}
+source("profiling-example.R")
+profvis(f())
+```
+
+### 23.2.2 Memory profiling
+
+```{r}
+profvis({x <- integer()
+for (i in 1:1e4) {
+  x <- c(x, i)
+}})
+```
+
+### 23.2.3 Limitations
+
+```{r}
+profvis::profvis({i <- function() {
+  pause(0.1)
+  10
+}
+j <- function(x) {
+  x + 10
+}
+j(i())})
+```
+
+```{r}
+profvis::profvis({i <- function() {
+  pause(0.1)
+  force(10)
+}
+j <- function(x) {
+  x + 10
+}
+j(i())})
+```
+
+### 23.2.4 Exercises
+
+1. Profile the following function with `torture = TRUE`. What is surprising? Read the source code of `rm()` to figure out what’s going on.
+
+```{r, error = TRUE}
+profvis({
+  f <- function(n = 1e5) {
+  x <- rep(1, n)
+  rm(x)
+  }}
+  )
+```
+
+
+```{r}
+profvis({
+  f <- function(n = 1e5) {
+  x <- rep(1, n)
+  rm(x)
+  }},
+  torture = TRUE)
+```
+
+Without torture it runs so quick there's nothing to parse. It's taking forever to run. Definitely slower than the other examples.
+
+## 23.3 Microbenchmarking
+
+```{r}
+x <- runif(100)
+(lb <- bench::mark(
+  sqrt(x),
+  x ^ 0.5
+))
+```
+
+### 23.3.1 `bench::mark()` results
+
+```{r}
+plot(lb)
+```
+
+```{r}
+lb[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+### 23.3.2 Interpreting results
+
+### 23.3.3 Exercises
+
+1. Instead of using `bench::mark()`, you could use the built-in function `system.time()`. But `system.time()` is much less precise, so you’ll need to repeat each operation many times with a loop, and then divide to find the average time of each operation, as in the code below.
+
+```{r}
+n <- 1e6
+system.time(for (i in 1:n) sqrt(x)) / n
+system.time(for (i in 1:n) x ^ 0.5) / n
+```
+
+How do the estimates from `system.time()` compare to those from `bench::mark()`? Why are they different?
+
+```{r}
+x <- runif(100)
+n <- 1e6
+
+system_a <- system.time(for (i in 1:n) sqrt(x)) / n
+system_a <- system_a[3]
+
+system_b <- system.time(for (i in 1:n) x ^ 0.5) / n
+system_b <- system_b[3]
+
+lb <- bench::mark(
+  sqrt(x),
+  x ^ 0.5
+)
+
+bench_a <- mean(unlist(lb[1,"time"]))
+bench_b <- mean(unlist(lb[2,"time"]))
+
+data.frame(bench = c(bench_a, bench_b),
+           BaseR = c(system_a, system_b))
+```
+
+The exponential function is about the same, but the sqrt function is slower in the loop. Magnitude is the same though.
+
+2. Here are two other ways to compute the square root of a vector. Which do you think will be fastest? Which will be slowest? Use microbenchmarking to test your answers.
+
+```{r}
+x ^ (1 / 2) # Slower
+exp(log(x) / 2) # Faster
+```
+
+```{r}
+lb <- bench::mark(
+  sqrt(x), # 1
+  x ^ 0.5, # 2
+  x ^ (1 / 2), # 3
+  exp(log(x) / 2) # 4
+)
+
+lb[c("expression", "min", "median", "itr/sec", "n_gc")] %>%
+  arrange(3)
+```
+
+`sqrt` function is optimized, then each function after it is adding one more call to the calculation which slows it down further.
