@@ -1,0 +1,231 @@
+---
+title: "24 Improving Performance"
+output: html_document
+date: "2023-09-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 24 Improving Performance
+## 24.1 Introduction
+
+```{r}
+library(tidyverse)
+library(profvis)
+library(bench)
+```
+
+## 24.2 Code organisation
+
+```{r}
+mean1 <- function(x) mean(x)
+mean2 <- function(x) sum(x) / length(x)
+
+x <- runif(1e5)
+
+a <- bench::mark(
+  mean1(x),
+  mean2(x)
+)
+a[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+## 24.3 Checking for existing solutions
+
+### 24.3.1 Exercises
+
+1. What are faster alternatives to `lm()`? Which are specifically designed to work with larger datasets?
+
+`lm.fit` more barebones and faster
+`fastLm` from RcppEigen
+`speedlm` from speedglm works on large data sets.
+
+
+2. What package implements a version of `match()` that’s faster for repeated lookups? How much faster is it?
+
+fastmatch
+
+```{r}
+i = rnorm(2e6)
+names(i) = as.integer(rnorm(2e6))
+```
+
+```{r}
+## compare sorting and coalesce
+system.time(o <- i[order(names(i))])
+system.time(o <- i[fastmatch::coalesce(names(i))])
+```
+
+```{r}
+## more fair comparison taking the coalesce time (and copy) into account
+system.time(tapply(i, names(i), sum))
+system.time({ o <- i[fastmatch::coalesce(names(i))]; fastmatch::ctapply(o, names(o), sum) })
+```
+
+A lot faster
+
+3. List four functions (not just those in base R) that convert a string into a date time object. What are their strengths and weaknesses?
+
+`as.POSIXct`, `as.Date`, `lubridate::ymd`, `lubridate::mdy`, `ISOdate`. I'm just gonna stick to lubridate
+
+
+4. Which packages provide the ability to compute a rolling mean?
+
+zoo and RcppRoll
+
+5. What are the alternatives to `optim()`?
+
+optimParallel and optimr
+
+## 24.4 Doing as little as possible
+### 24.4.1 `mean()`
+
+```{r}
+x <- runif(1e2)
+
+bench::mark(
+  mean(x),
+  mean.default(x)
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+```{r}
+x <- runif(1e2)
+bench::mark(
+  mean(x),
+  mean.default(x),
+  .Internal(mean(x))
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+```{r}
+x <- runif(1e4)
+bench::mark(
+  mean(x),
+  mean.default(x),
+  .Internal(mean(x))
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+### 24.4.2 `as.data.frame()`
+
+```{r}
+quickdf <- function(l) {
+  class(l) <- "data.frame"
+  attr(l, "row.names") <- .set_row_names(length(l[[1]]))
+  l
+}
+
+
+l <- lapply(1:26, function(i) runif(1e3))
+names(l) <- letters
+
+bench::mark(
+  as.data.frame = as.data.frame(l),
+  quick_df      = quickdf(l)
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+```{r}
+quickdf(list(x = 1, y = 1:2))
+```
+
+### 24.4.3 Exercises
+
+1. What’s the difference between `rowSums()` and `.rowSums()`?
+
+```{r}
+rowSums
+```
+
+```{r}
+.rowSums
+```
+
+The later doesn't have flexibility, it expects a specifically formatted matrix while the former while convert for you.
+
+2. Make a faster version of `chisq.test()` that only computes the chi-square test statistic when the input is two numeric vectors with no missing values. You can try simplifying `chisq.test()` or by coding from the mathematical definition.
+
+```{r}
+chisq.test(x = c(1,2,3), y = c(11,12,13))
+
+chisq.test.fast <- function(x,y){
+  x <- table(x, y)
+  n <- sum(x)
+  sr <- rowSums(x)
+  sc <- colSums(x)
+  E <- outer(sr, sc)/n
+  sum(sort((x - E)^2/E, decreasing = TRUE))
+}
+
+chisq.test.fast(x = c(1,2,3), y = c(11,12,13))
+
+a <- rnorm(1e3)
+b <- rnorm(1e3)
+
+bench::mark(
+  OG = chisq.test(x = a, y = b),
+  Me = chisq.test.fast(x = a, y = b),
+  check = FALSE
+)
+```
+
+3. Can you make a faster version of `table()` for the case of an input of two integer vectors with no missing values? Can you use it to speed up your chi-square test?
+
+```{r}
+#Cheating cause lazy
+table2 <- function(a, b){
+  
+  a_s <- sort(unique(a))
+  b_s <- sort(unique(b))
+  
+  a_l <- length(a_s)
+  b_l <- length(b_s)
+  
+  dims <- c(a_l, b_l)
+  pr <- a_l * b_l
+  dn <- list(a = a_s, b = b_s)
+  
+  bin <- fastmatch::fmatch(a, a_s) +
+    a_l * fastmatch::fmatch(b, b_s) - a_l
+  y <- tabulate(bin, pr)
+  
+  y <- array(y, dim = dims, dimnames = dn)
+  class(y) <- "table"
+  
+  y
+}
+
+a <- sample(100, 10000, TRUE)
+b <- sample(100, 10000, TRUE)
+
+bench::mark(
+  table(a, b),
+  table2(a, b)
+)
+
+####
+
+chisq.test.fast2 <- function(x,y){
+  x <- table2(x, y)
+  n <- sum(x)
+  sr <- rowSums(x)
+  sc <- colSums(x)
+  E <- outer(sr, sc)/n
+  sum(sort((x - E)^2/E, decreasing = TRUE))
+}
+
+a <- rnorm(1e3)
+b <- rnorm(1e3)
+
+bench::mark(
+  OG = chisq.test(x = a, y = b),
+  Me = chisq.test.fast(x = a, y = b),
+  Me2 = chisq.test.fast2(x = a, y = b),
+  check = FALSE
+)
+```
+
+
