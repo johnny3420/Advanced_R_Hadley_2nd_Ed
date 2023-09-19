@@ -372,6 +372,7 @@ display: none;
 ## ℹ Use the conflicted package (&lt;http://conflicted.r-lib.org/&gt;) to force all conflicts to become errors</code></pre>
 <pre class="r"><code>library(profvis)
 library(bench)</code></pre>
+<pre><code>## Warning: package &#39;bench&#39; was built under R version 4.3.1</code></pre>
 </div>
 <div id="code-organisation" class="section level2">
 <h2>24.2 Code organisation</h2>
@@ -388,8 +389,8 @@ a[c(&quot;expression&quot;, &quot;min&quot;, &quot;median&quot;, &quot;itr/sec&q
 <pre><code>## # A tibble: 2 × 4
 ##   expression      min   median `itr/sec`
 ##   &lt;bch:expr&gt; &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
-## 1 mean1(x)    168.6µs  202.5µs     4358.
-## 2 mean2(x)     82.1µs   93.4µs     8718.</code></pre>
+## 1 mean1(x)      127µs  136.2µs     6912.
+## 2 mean2(x)       62µs   67.7µs    14250.</code></pre>
 </div>
 <div id="checking-for-existing-solutions" class="section level2">
 <h2>24.3 Checking for existing solutions</h2>
@@ -412,17 +413,17 @@ names(i) = as.integer(rnorm(2e6))</code></pre>
 <pre class="r"><code>## compare sorting and coalesce
 system.time(o &lt;- i[order(names(i))])</code></pre>
 <pre><code>##    user  system elapsed 
-##   21.09    0.02   21.27</code></pre>
+##   12.31    0.00   12.31</code></pre>
 <pre class="r"><code>system.time(o &lt;- i[fastmatch::coalesce(names(i))])</code></pre>
 <pre><code>##    user  system elapsed 
-##    0.05    0.00    0.13</code></pre>
+##    0.05    0.00    0.05</code></pre>
 <pre class="r"><code>## more fair comparison taking the coalesce time (and copy) into account
 system.time(tapply(i, names(i), sum))</code></pre>
 <pre><code>##    user  system elapsed 
-##    0.32    0.00    0.31</code></pre>
+##    0.18    0.00    0.19</code></pre>
 <pre class="r"><code>system.time({ o &lt;- i[fastmatch::coalesce(names(i))]; fastmatch::ctapply(o, names(o), sum) })</code></pre>
 <pre><code>##    user  system elapsed 
-##    0.08    0.01    0.09</code></pre>
+##    0.05    0.01    0.06</code></pre>
 <p>A lot faster</p>
 <ol start="3" style="list-style-type: decimal">
 <li>List four functions (not just those in base R) that convert a string
@@ -454,8 +455,8 @@ bench::mark(
 <pre><code>## # A tibble: 2 × 4
 ##   expression           min   median `itr/sec`
 ##   &lt;bch:expr&gt;      &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
-## 1 mean(x)              4µs    5.2µs   137485.
-## 2 mean.default(x)    1.5µs    2.2µs   241724.</code></pre>
+## 1 mean(x)            2.9µs    3.2µs   259065.
+## 2 mean.default(x)    1.1µs    1.2µs   497934.</code></pre>
 <pre class="r"><code>x &lt;- runif(1e2)
 bench::mark(
   mean(x),
@@ -465,9 +466,9 @@ bench::mark(
 <pre><code>## # A tibble: 3 × 4
 ##   expression              min   median `itr/sec`
 ##   &lt;bch:expr&gt;         &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
-## 1 mean(x)                 4µs    5.2µs   138256.
-## 2 mean.default(x)       1.5µs    1.9µs   347311.
-## 3 .Internal(mean(x))    200ns    300ns  2381122.</code></pre>
+## 1 mean(x)               2.9µs    3.2µs   265173.
+## 2 mean.default(x)       1.1µs    1.2µs   603529.
+## 3 .Internal(mean(x))    100ns    100ns  4804228.</code></pre>
 <pre class="r"><code>x &lt;- runif(1e4)
 bench::mark(
   mean(x),
@@ -477,9 +478,9 @@ bench::mark(
 <pre><code>## # A tibble: 3 × 4
 ##   expression              min   median `itr/sec`
 ##   &lt;bch:expr&gt;         &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
-## 1 mean(x)              20.2µs   23.3µs    35133.
-## 2 mean.default(x)      17.6µs   20.4µs    39956.
-## 3 .Internal(mean(x))   16.3µs   18.4µs    46294.</code></pre>
+## 1 mean(x)              15.1µs   16.2µs    55050.
+## 2 mean.default(x)      13.3µs   13.5µs    66896.
+## 3 .Internal(mean(x))   12.2µs   12.3µs    73063.</code></pre>
 </div>
 <div id="as.data.frame" class="section level3">
 <h3>24.4.2 <code>as.data.frame()</code></h3>
@@ -500,8 +501,8 @@ bench::mark(
 <pre><code>## # A tibble: 2 × 4
 ##   expression         min   median `itr/sec`
 ##   &lt;bch:expr&gt;    &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
-## 1 as.data.frame   1.16ms   1.63ms      569.
-## 2 quick_df         5.9µs    7.8µs    82787.</code></pre>
+## 1 as.data.frame  772.8µs  860.4µs     1131.
+## 2 quick_df         4.4µs    4.9µs   173400.</code></pre>
 <pre class="r"><code>quickdf(list(x = 1, y = 1:2))</code></pre>
 <pre><code>## Warning in format.data.frame(if (omit) x[seq_len(n0), , drop = FALSE] else x, :
 ## corrupt data frame: columns will be truncated or padded with NAs</code></pre>
@@ -536,12 +537,12 @@ bench::mark(
 ##     else names(z) &lt;- dimnames(x)[[1L]]
 ##     z
 ## }
-## &lt;bytecode: 0x000001559323beb0&gt;
+## &lt;bytecode: 0x000001e06bcf7a98&gt;
 ## &lt;environment: namespace:base&gt;</code></pre>
 <pre class="r"><code>.rowSums</code></pre>
 <pre><code>## function (x, m, n, na.rm = FALSE) 
 ## .Internal(rowSums(x, m, n, na.rm))
-## &lt;bytecode: 0x000001558ff38228&gt;
+## &lt;bytecode: 0x000001e06c8ef2a8&gt;
 ## &lt;environment: namespace:base&gt;</code></pre>
 <p>The later doesn’t have flexibility, it expects a specifically
 formatted matrix while the former while convert for you.</p>
@@ -586,14 +587,18 @@ bench::mark(
 
 ## Warning in chisq.test(x = a, y = b): Chi-squared approximation may be incorrect
 
+## Warning in chisq.test(x = a, y = b): Chi-squared approximation may be incorrect
+
+## Warning in chisq.test(x = a, y = b): Chi-squared approximation may be incorrect
+
 ## Warning in chisq.test(x = a, y = b): Chi-squared approximation may be incorrect</code></pre>
 <pre><code>## Warning: Some expressions had a GC in every iteration; so filtering is
 ## disabled.</code></pre>
 <pre><code>## # A tibble: 2 × 6
 ##   expression      min   median `itr/sec` mem_alloc `gc/sec`
 ##   &lt;bch:expr&gt; &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt; &lt;bch:byt&gt;    &lt;dbl&gt;
-## 1 OG            112ms    163ms      6.32     130MB    14.2 
-## 2 Me            109ms    118ms      8.51      50MB     8.51</code></pre>
+## 1 OG           60.4ms   93.3ms      11.2     130MB    26.1 
+## 2 Me           63.1ms     67ms      14.8      50MB     9.28</code></pre>
 <ol start="3" style="list-style-type: decimal">
 <li>Can you make a faster version of <code>table()</code> for the case
 of an input of two integer vectors with no missing values? Can you use
@@ -632,8 +637,8 @@ bench::mark(
 <pre><code>## # A tibble: 2 × 6
 ##   expression        min   median `itr/sec` mem_alloc `gc/sec`
 ##   &lt;bch:expr&gt;   &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt; &lt;bch:byt&gt;    &lt;dbl&gt;
-## 1 table(a, b)     954µs   1.53ms      601.    1.19MB    11.3 
-## 2 table2(a, b)    292µs  636.6µs     1444.  567.48KB     7.66</code></pre>
+## 1 table(a, b)     682µs    868µs     1116.    1.19MB    11.4 
+## 2 table2(a, b)    260µs    370µs     2543.  567.48KB     9.12</code></pre>
 <pre class="r"><code>####
 
 chisq.test.fast2 &lt;- function(x,y){
@@ -662,16 +667,220 @@ bench::mark(
 
 ## Warning in chisq.test(x = a, y = b): Chi-squared approximation may be incorrect
 
+## Warning in chisq.test(x = a, y = b): Chi-squared approximation may be incorrect
+
+## Warning in chisq.test(x = a, y = b): Chi-squared approximation may be incorrect
+
+## Warning in chisq.test(x = a, y = b): Chi-squared approximation may be incorrect
+
 ## Warning in chisq.test(x = a, y = b): Chi-squared approximation may be incorrect</code></pre>
 <pre><code>## Warning: Some expressions had a GC in every iteration; so filtering is
 ## disabled.</code></pre>
 <pre><code>## # A tibble: 3 × 6
 ##   expression      min   median `itr/sec` mem_alloc `gc/sec`
 ##   &lt;bch:expr&gt; &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt; &lt;bch:byt&gt;    &lt;dbl&gt;
-## 1 OG            111ms    122ms      6.89   130.1MB    20.7 
-## 2 Me            112ms    128ms      7.07      50MB     5.30
-## 3 Me2           111ms    118ms      8.41    49.8MB     6.73</code></pre>
+## 1 OG           61.4ms   65.7ms      13.7   130.1MB    25.5 
+## 2 Me           62.1ms   66.7ms      13.6      50MB     5.81
+## 3 Me2          60.1ms   66.9ms      14.9    49.8MB     9.30</code></pre>
 </div>
+</div>
+<div id="vectorise" class="section level2">
+<h2>24.5 Vectorise</h2>
+<pre class="r"><code>rowAny &lt;- function(x) rowSums(x) &gt; 0
+rowAll &lt;- function(x) rowSums(x) == ncol(x)</code></pre>
+<pre class="r"><code>lookup &lt;- setNames(as.list(sample(100, 26)), letters)
+
+x1 &lt;- &quot;j&quot;
+x10 &lt;- sample(letters, 10)
+x100 &lt;- sample(letters, 100, replace = TRUE)
+
+bench::mark(
+  lookup[x1],
+  lookup[x10],
+  lookup[x100],
+  check = FALSE
+)[c(&quot;expression&quot;, &quot;min&quot;, &quot;median&quot;, &quot;itr/sec&quot;, &quot;n_gc&quot;)]</code></pre>
+<pre><code>## # A tibble: 3 × 4
+##   expression        min   median `itr/sec`
+##   &lt;bch:expr&gt;   &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
+## 1 lookup[x1]      200ns    300ns  2729034.
+## 2 lookup[x10]     600ns    700ns  1287614.
+## 3 lookup[x100]    1.7µs    1.9µs   346221.</code></pre>
+<div id="exercises-2" class="section level3">
+<h3>24.5.1 Exercises</h3>
+<ol style="list-style-type: decimal">
+<li>The density functions, e.g., <code>dnorm()</code>, have a common
+interface. Which arguments are vectorised over? What does
+<code>rnorm(10, mean = 10:1)</code> do?</li>
+</ol>
+<pre class="r"><code>rnorm(10)</code></pre>
+<pre><code>##  [1] -1.3751497188  0.4297960749 -0.4078120963 -1.2738748887  0.2261344142
+##  [6] -0.0004985701 -0.7680704124 -0.9516701483  0.1449912923 -0.1181435273</code></pre>
+<pre class="r"><code>rnorm(10, mean = 10:1)</code></pre>
+<pre><code>##  [1]  8.734677 11.004672  8.206824  8.011589  6.393662  5.655104  5.085871
+##  [8]  4.790537  3.191684 -1.001150</code></pre>
+<p><code>x</code>, <code>q</code>, <code>p</code>, <code>mean</code>,
+and <code>sd</code> are all vectorized. rnorm will create 10 random
+numbers from 10 different distributions, the mean from each distribution
+comes from the value in the vector <code>[10:1]</code> hence why the
+values are going down in the result</p>
+<p>2.Compare the speed of <code>apply(x, 1, sum)</code> with
+<code>rowSums(x)</code> for varying sizes of x</p>
+<pre class="r"><code>x1 &lt;- matrix(rnorm(1e2), nrow = 10)
+x10 &lt;- matrix(rnorm(1e4), nrow = 10)
+x100 &lt;- matrix(rnorm(1e6), nrow = 10)
+bench::mark(
+  apply(x1, 1, sum),
+  rowSums(x1),
+  apply(x10, 1, sum),
+  rowSums(x10),
+  apply(x100, 1, sum),
+  rowSums(x100),
+  check = FALSE
+)[c(&quot;expression&quot;, &quot;min&quot;, &quot;median&quot;, &quot;itr/sec&quot;, &quot;n_gc&quot;)]</code></pre>
+<pre><code>## # A tibble: 6 × 4
+##   expression               min   median `itr/sec`
+##   &lt;bch:expr&gt;          &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
+## 1 apply(x1, 1, sum)     16.4µs     18µs    46449.
+## 2 rowSums(x1)            2.1µs    2.3µs   378020.
+## 3 apply(x10, 1, sum)    53.8µs   89.2µs     9738.
+## 4 rowSums(x10)          21.2µs   21.7µs    41682.
+## 5 apply(x100, 1, sum)   8.05ms   9.07ms      106.
+## 6 rowSums(x100)         1.99ms   2.12ms      459.</code></pre>
+<p>Using <code>rowSums</code> is a lot faster.</p>
+<ol start="3" style="list-style-type: decimal">
+<li>How can you use <code>crossprod()</code> to compute a weighted sum?
+How much faster is it than the naive <code>sum(x * w)</code>?</li>
+</ol>
+<pre class="r"><code>x &lt;- rnorm(1e6)
+y &lt;- rnorm(1e6, mean = -1)
+
+a &lt;- crossprod(x,y)[[1]]
+b &lt;- sum(x*y)
+all.equal(a,b)</code></pre>
+<pre><code>## [1] TRUE</code></pre>
+<pre class="r"><code>x1 &lt;- rnorm(1e8)
+y1 &lt;- rnorm(1e8, mean = -1)
+bench::mark(
+  crossprod(x,y)[[1]],
+  sum(x*y),
+  crossprod(x1,y1)[[1]],
+  sum(x1*y1),
+  check = FALSE
+)[c(&quot;expression&quot;, &quot;min&quot;, &quot;median&quot;, &quot;itr/sec&quot;, &quot;n_gc&quot;)]</code></pre>
+<pre><code>## Warning: Some expressions had a GC in every iteration; so filtering is
+## disabled.</code></pre>
+<pre><code>## # A tibble: 4 × 4
+##   expression                  min   median `itr/sec`
+##   &lt;bch:expr&gt;             &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
+## 1 crossprod(x, y)[[1]]     1.86ms   2.08ms    459.  
+## 2 sum(x * y)                  2ms   2.23ms    377.  
+## 3 crossprod(x1, y1)[[1]] 217.97ms 223.75ms      4.50
+## 4 sum(x1 * y1)           259.36ms 274.95ms      3.64</code></pre>
+<p>Slightly faster</p>
+</div>
+</div>
+<div id="avoiding-copies" class="section level2">
+<h2>24.6 Avoiding copies</h2>
+<pre class="r"><code>random_string &lt;- function() {
+  paste(sample(letters, 50, replace = TRUE), collapse = &quot;&quot;)
+}
+strings10 &lt;- replicate(10, random_string())
+strings100 &lt;- replicate(100, random_string())
+
+collapse &lt;- function(xs) {
+  out &lt;- &quot;&quot;
+  for (x in xs) {
+    out &lt;- paste0(out, x)
+  }
+  out
+}
+
+bench::mark(
+  loop10  = collapse(strings10),
+  loop100 = collapse(strings100),
+  vec10   = paste(strings10, collapse = &quot;&quot;),
+  vec100  = paste(strings100, collapse = &quot;&quot;),
+  check = FALSE
+)[c(&quot;expression&quot;, &quot;min&quot;, &quot;median&quot;, &quot;itr/sec&quot;, &quot;n_gc&quot;)]</code></pre>
+<pre><code>## # A tibble: 4 × 4
+##   expression      min   median `itr/sec`
+##   &lt;bch:expr&gt; &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
+## 1 loop10       17.9µs   19.4µs    46812.
+## 2 loop100       446µs  504.1µs     1933.
+## 3 vec10         2.9µs    3.4µs   275006.
+## 4 vec100       17.8µs   18.7µs    46229.</code></pre>
+</div>
+<div id="case-study-t-test" class="section level2">
+<h2>24.7 Case study: t-test</h2>
+<pre class="r"><code>m &lt;- 1000
+n &lt;- 50
+X &lt;- matrix(rnorm(m * n, mean = 10, sd = 3), nrow = m)
+grp &lt;- rep(1:2, each = n / 2)</code></pre>
+<pre class="r"><code>system.time(
+  for (i in 1:m) {
+    t.test(X[i, ] ~ grp)$statistic
+  }
+)</code></pre>
+<pre><code>##    user  system elapsed 
+##    0.33    0.00    0.32</code></pre>
+<pre class="r"><code>system.time(
+  for (i in 1:m) {
+    t.test(X[i, grp == 1], X[i, grp == 2])$statistic
+  }
+)</code></pre>
+<pre><code>##    user  system elapsed 
+##    0.11    0.00    0.11</code></pre>
+<pre class="r"><code>compT &lt;- function(i){
+  t.test(X[i, grp == 1], X[i, grp == 2])$statistic
+}
+system.time(t1 &lt;- purrr::map_dbl(1:m, compT))</code></pre>
+<pre><code>##    user  system elapsed 
+##    0.11    0.00    0.11</code></pre>
+<pre class="r"><code>head(t1)</code></pre>
+<pre><code>## [1]  2.0894032  1.5231600  0.8903660  0.8473537 -1.3702493  0.9078501</code></pre>
+<pre class="r"><code>my_t &lt;- function(x, grp) {
+  t_stat &lt;- function(x) {
+    m &lt;- mean(x)
+    n &lt;- length(x)
+    var &lt;- sum((x - m) ^ 2) / (n - 1)
+
+    list(m = m, n = n, var = var)
+  }
+
+  g1 &lt;- t_stat(x[grp == 1])
+  g2 &lt;- t_stat(x[grp == 2])
+
+  se_total &lt;- sqrt(g1$var / g1$n + g2$var / g2$n)
+  (g1$m - g2$m) / se_total
+}
+
+system.time(t2 &lt;- purrr::map_dbl(1:m, ~ my_t(X[.,], grp)))</code></pre>
+<pre><code>##    user  system elapsed 
+##    0.02    0.00    0.02</code></pre>
+<pre class="r"><code>stopifnot(all.equal(t1, t2))</code></pre>
+<pre class="r"><code>rowtstat &lt;- function(X, grp){
+  t_stat &lt;- function(X) {
+    m &lt;- rowMeans(X)
+    n &lt;- ncol(X)
+    var &lt;- rowSums((X - m) ^ 2) / (n - 1)
+
+    list(m = m, n = n, var = var)
+  }
+
+  g1 &lt;- t_stat(X[, grp == 1])
+  g2 &lt;- t_stat(X[, grp == 2])
+
+  se_total &lt;- sqrt(g1$var / g1$n + g2$var / g2$n)
+  (g1$m - g2$m) / se_total
+}
+system.time(t3 &lt;- rowtstat(X, grp))</code></pre>
+<pre><code>##    user  system elapsed 
+##    0.01    0.00    0.02</code></pre>
+<pre class="r"><code>stopifnot(all.equal(t1, t3))</code></pre>
+</div>
+<div id="other-techniques" class="section level2">
+<h2>24.8 Other techniques</h2>
 </div>
 </div>
 

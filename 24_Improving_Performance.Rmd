@@ -228,4 +228,177 @@ bench::mark(
 )
 ```
 
+## 24.5 Vectorise
 
+```{r}
+rowAny <- function(x) rowSums(x) > 0
+rowAll <- function(x) rowSums(x) == ncol(x)
+```
+
+```{r}
+lookup <- setNames(as.list(sample(100, 26)), letters)
+
+x1 <- "j"
+x10 <- sample(letters, 10)
+x100 <- sample(letters, 100, replace = TRUE)
+
+bench::mark(
+  lookup[x1],
+  lookup[x10],
+  lookup[x100],
+  check = FALSE
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+### 24.5.1 Exercises
+
+1. The density functions, e.g., `dnorm()`, have a common interface. Which arguments are vectorised over? What does `rnorm(10, mean = 10:1)` do?
+
+```{r}
+rnorm(10)
+rnorm(10, mean = 10:1)
+
+```
+`x`, `q`, `p`, `mean`, and `sd` are all vectorized. rnorm will create 10 random numbers from 10 different distributions, the mean from each distribution comes from the value in the vector `[10:1]` hence why the values are going down in the result
+
+2.Compare the speed of `apply(x, 1, sum)` with `rowSums(x)` for varying sizes of x
+
+```{r}
+x1 <- matrix(rnorm(1e2), nrow = 10)
+x10 <- matrix(rnorm(1e4), nrow = 10)
+x100 <- matrix(rnorm(1e6), nrow = 10)
+bench::mark(
+  apply(x1, 1, sum),
+  rowSums(x1),
+  apply(x10, 1, sum),
+  rowSums(x10),
+  apply(x100, 1, sum),
+  rowSums(x100),
+  check = FALSE
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+Using `rowSums` is a lot faster.
+
+3. How can you use `crossprod()` to compute a weighted sum? How much faster is it than the naive `sum(x * w)`?
+
+```{r}
+x <- rnorm(1e6)
+y <- rnorm(1e6, mean = -1)
+
+a <- crossprod(x,y)[[1]]
+b <- sum(x*y)
+all.equal(a,b)
+
+x1 <- rnorm(1e8)
+y1 <- rnorm(1e8, mean = -1)
+bench::mark(
+  crossprod(x,y)[[1]],
+  sum(x*y),
+  crossprod(x1,y1)[[1]],
+  sum(x1*y1),
+  check = FALSE
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+Slightly faster
+
+## 24.6 Avoiding copies
+
+```{r}
+random_string <- function() {
+  paste(sample(letters, 50, replace = TRUE), collapse = "")
+}
+strings10 <- replicate(10, random_string())
+strings100 <- replicate(100, random_string())
+
+collapse <- function(xs) {
+  out <- ""
+  for (x in xs) {
+    out <- paste0(out, x)
+  }
+  out
+}
+
+bench::mark(
+  loop10  = collapse(strings10),
+  loop100 = collapse(strings100),
+  vec10   = paste(strings10, collapse = ""),
+  vec100  = paste(strings100, collapse = ""),
+  check = FALSE
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+## 24.7 Case study: t-test
+
+```{r}
+m <- 1000
+n <- 50
+X <- matrix(rnorm(m * n, mean = 10, sd = 3), nrow = m)
+grp <- rep(1:2, each = n / 2)
+```
+
+```{r}
+system.time(
+  for (i in 1:m) {
+    t.test(X[i, ] ~ grp)$statistic
+  }
+)
+
+system.time(
+  for (i in 1:m) {
+    t.test(X[i, grp == 1], X[i, grp == 2])$statistic
+  }
+)
+```
+```{r}
+compT <- function(i){
+  t.test(X[i, grp == 1], X[i, grp == 2])$statistic
+}
+system.time(t1 <- purrr::map_dbl(1:m, compT))
+head(t1)
+```
+
+```{r}
+my_t <- function(x, grp) {
+  t_stat <- function(x) {
+    m <- mean(x)
+    n <- length(x)
+    var <- sum((x - m) ^ 2) / (n - 1)
+
+    list(m = m, n = n, var = var)
+  }
+
+  g1 <- t_stat(x[grp == 1])
+  g2 <- t_stat(x[grp == 2])
+
+  se_total <- sqrt(g1$var / g1$n + g2$var / g2$n)
+  (g1$m - g2$m) / se_total
+}
+
+system.time(t2 <- purrr::map_dbl(1:m, ~ my_t(X[.,], grp)))
+
+stopifnot(all.equal(t1, t2))
+```
+
+```{r}
+rowtstat <- function(X, grp){
+  t_stat <- function(X) {
+    m <- rowMeans(X)
+    n <- ncol(X)
+    var <- rowSums((X - m) ^ 2) / (n - 1)
+
+    list(m = m, n = n, var = var)
+  }
+
+  g1 <- t_stat(X[, grp == 1])
+  g2 <- t_stat(X[, grp == 2])
+
+  se_total <- sqrt(g1$var / g1$n + g2$var / g2$n)
+  (g1$m - g2$m) / se_total
+}
+system.time(t3 <- rowtstat(X, grp))
+
+stopifnot(all.equal(t1, t3))
+```
+
+## 24.8 Other techniques
