@@ -370,7 +370,7 @@ display: none;
 
 add</code></pre>
 <pre><code>## function (x, y, z) 
-## .Call(&lt;pointer: 0x00007ffec2e11690&gt;, x, y, z)</code></pre>
+## .Call(&lt;pointer: 0x00007fff82181690&gt;, x, y, z)</code></pre>
 <pre class="r"><code>add(1, 2, 3)</code></pre>
 <pre><code>## [1] 6</code></pre>
 <div id="no-inputs-scalar-output" class="section level3">
@@ -431,9 +431,9 @@ bench::mark(
 <pre><code>## # A tibble: 3 × 6
 ##   expression      min   median `itr/sec` mem_alloc `gc/sec`
 ##   &lt;bch:expr&gt; &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt; &lt;bch:byt&gt;    &lt;dbl&gt;
-## 1 sum(x)        900ns    1.1µs   664863.        0B        0
-## 2 sumC(x)       1.9µs    2.2µs   285260.    2.49KB        0
-## 3 sumR(x)      21.4µs   22.4µs    36883.   35.66KB        0</code></pre>
+## 1 sum(x)        900ns      1µs   801687.        0B        0
+## 2 sumC(x)         2µs    2.2µs   268934.    2.49KB        0
+## 3 sumR(x)      21.5µs   22.3µs    39163.   35.66KB        0</code></pre>
 </div>
 <div id="vector-input-vector-output" class="section level3">
 <h3>25.2.4 Vector input, vector output</h3>
@@ -457,8 +457,8 @@ bench::mark(
 <pre><code>## # A tibble: 2 × 6
 ##   expression          min   median `itr/sec` mem_alloc `gc/sec`
 ##   &lt;bch:expr&gt;     &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt; &lt;bch:byt&gt;    &lt;dbl&gt;
-## 1 pdistR(0.5, y)   6.07ms   7.16ms      137.    7.63MB     70.1
-## 2 pdistC(0.5, y)   2.87ms   3.37ms      287.    7.63MB    143.</code></pre>
+## 1 pdistR(0.5, y)   6.22ms   7.03ms      129.    7.63MB     66.1
+## 2 pdistC(0.5, y)   2.77ms   3.41ms      260.    7.63MB    128.</code></pre>
 </div>
 <div id="using-sourcecpp" class="section level3">
 <h3>25.2.5 Using sourceCpp</h3>
@@ -476,8 +476,8 @@ using namespace Rcpp;</code></pre>
 ## # A tibble: 2 × 13
 ##   expression      min median `itr/sec` mem_alloc `gc/sec` n_itr  n_gc total_time
 ##   &lt;bch:expr&gt; &lt;bch:tm&gt; &lt;bch:&gt;     &lt;dbl&gt; &lt;bch:byt&gt;    &lt;dbl&gt; &lt;int&gt; &lt;dbl&gt;   &lt;bch:tm&gt;
-## 1 mean(x)       168µs  195µs     4552.        0B        0  2275     0      500ms
-## 2 meanC(x)      110µs  112µs     7658.    2.49KB        0  3827     0      500ms
+## 1 mean(x)       168µs  176µs     4545.        0B        0  2272     0      500ms
+## 2 meanC(x)      110µs  113µs     7401.    2.49KB        0  3699     0      500ms
 ## # ℹ 4 more variables: result &lt;list&gt;, memory &lt;list&gt;, time &lt;list&gt;, gc &lt;list&gt;</code></pre>
 </div>
 <div id="exercises" class="section level3">
@@ -761,6 +761,720 @@ double varC(NumericVector x){
 <pre><code>## [1] 9.166667</code></pre>
 </div>
 </div>
+</div>
+<div id="other-classes" class="section level2">
+<h2>25.3 Other classes</h2>
+<div id="lists-and-data-frames" class="section level3">
+<h3>25.3.1 Lists and data frames</h3>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+double mpe(List mod) {
+  if (!mod.inherits(&quot;lm&quot;)) stop(&quot;Input must be a linear model&quot;);
+
+  NumericVector resid = as&lt;NumericVector&gt;(mod[&quot;residuals&quot;]);
+  NumericVector fitted = as&lt;NumericVector&gt;(mod[&quot;fitted.values&quot;]);
+
+  int n = resid.size();
+  double err = 0;
+  for(int i = 0; i &lt; n; ++i) {
+    err += resid[i] / (fitted[i] + resid[i]);
+  }
+  return err / n;
+}</code></pre>
+<pre class="r"><code>mod &lt;- lm(mpg ~ wt, data = mtcars)
+mpe(mod)</code></pre>
+<pre><code>## [1] -0.01541615</code></pre>
+</div>
+<div id="functions" class="section level3">
+<h3>25.3.2 Functions</h3>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+RObject callWithOne(Function f) {
+  return f(1);
+}</code></pre>
+<pre class="r"><code>callWithOne(function(x) x + 1)</code></pre>
+<pre><code>## [1] 2</code></pre>
+<pre class="r"><code>callWithOne(paste)</code></pre>
+<pre><code>## [1] &quot;1&quot;</code></pre>
+<pre class="r"><code>f(&quot;y&quot;, 1);</code></pre>
+<pre class="r"><code>f(_[&quot;x&quot;] = &quot;y&quot;, _[&quot;value&quot;] = 1);</code></pre>
+</div>
+<div id="attributes" class="section level3">
+<h3>25.3.3 Attributes</h3>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+NumericVector attribs() {
+  NumericVector out = NumericVector::create(1, 2, 3);
+
+  out.names() = CharacterVector::create(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;);
+  out.attr(&quot;my-attr&quot;) = &quot;my-value&quot;;
+  out.attr(&quot;class&quot;) = &quot;my-class&quot;;
+
+  return out;
+}</code></pre>
+</div>
+</div>
+<div id="missing-values" class="section level2">
+<h2>25.4 Missing values</h2>
+<div id="scalars" class="section level3">
+<h3>25.4.1 Scalars</h3>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+List scalar_missings() {
+  int int_s = NA_INTEGER;
+  String chr_s = NA_STRING;
+  bool lgl_s = NA_LOGICAL;
+  double num_s = NA_REAL;
+
+  return List::create(int_s, chr_s, lgl_s, num_s);
+}</code></pre>
+<pre class="r"><code>str(scalar_missings())</code></pre>
+<pre><code>## List of 4
+##  $ : int NA
+##  $ : chr NA
+##  $ : logi TRUE
+##  $ : num NA</code></pre>
+<div id="integers" class="section level4">
+<h4>25.4.1.1 Integers</h4>
+</div>
+<div id="doubles" class="section level4">
+<h4>25.4.1.2 Doubles</h4>
+<pre class="r"><code>evalCpp(&quot;NAN == 1&quot;)</code></pre>
+<pre><code>## [1] FALSE</code></pre>
+<pre class="r"><code>evalCpp(&quot;NAN &lt; 1&quot;)</code></pre>
+<pre><code>## [1] FALSE</code></pre>
+<pre class="r"><code>evalCpp(&quot;NAN &gt; 1&quot;)</code></pre>
+<pre><code>## [1] FALSE</code></pre>
+<pre class="r"><code>evalCpp(&quot;NAN == NAN&quot;)</code></pre>
+<pre><code>## [1] FALSE</code></pre>
+<pre class="r"><code>evalCpp(&quot;NAN &amp;&amp; TRUE&quot;)</code></pre>
+<pre><code>## [1] TRUE</code></pre>
+<pre class="r"><code>evalCpp(&quot;NAN || FALSE&quot;)</code></pre>
+<pre><code>## [1] TRUE</code></pre>
+<pre class="r"><code>evalCpp(&quot;NAN + 1&quot;)</code></pre>
+<pre><code>## [1] NaN</code></pre>
+<pre class="r"><code>evalCpp(&quot;NAN - 1&quot;)</code></pre>
+<pre><code>## [1] NaN</code></pre>
+<pre class="r"><code>evalCpp(&quot;NAN / 1&quot;)</code></pre>
+<pre><code>## [1] NaN</code></pre>
+<pre class="r"><code>evalCpp(&quot;NAN * 1&quot;)</code></pre>
+<pre><code>## [1] NaN</code></pre>
+</div>
+</div>
+<div id="strings" class="section level3">
+<h3>25.4.2 Strings</h3>
+</div>
+<div id="boolean" class="section level3">
+<h3>25.4.3 Boolean</h3>
+</div>
+<div id="vectors" class="section level3">
+<h3>25.4.4 Vectors</h3>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+List missing_sampler() {
+  return List::create(
+    NumericVector::create(NA_REAL),
+    IntegerVector::create(NA_INTEGER),
+    LogicalVector::create(NA_LOGICAL),
+    CharacterVector::create(NA_STRING)
+  );
+}</code></pre>
+<pre class="r"><code>str(missing_sampler())</code></pre>
+<pre><code>## List of 4
+##  $ : num NA
+##  $ : int NA
+##  $ : logi NA
+##  $ : chr NA</code></pre>
+</div>
+<div id="exercises-1" class="section level3">
+<h3>25.4.5 Exercises</h3>
+<ol style="list-style-type: decimal">
+<li>Rewrite any of the functions from the first exercise of Section
+25.2.6 to deal with missing values. If <code>na.rm</code> is true,
+ignore the missing values. If <code>na.rm</code> is false, return a
+missing value if the input contains any missing values. Some good
+functions to practice with are <code>min()</code>, <code>max()</code>,
+<code>range()</code>, <code>mean()</code>, and <code>var()</code>.</li>
+</ol>
+<p><code>mean()</code></p>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+double f1(NumericVector x, bool na_rm = false) {
+  int og_n = x.size();
+  int n = x.size();
+  double y = 0;
+  
+  if (na_rm){
+    for(int i = 0; i &lt; og_n; ++i) {
+      if (NumericVector::is_na(x[i])) {
+        n -= 1;
+        continue;
+        }
+      y += x[i];
+      }
+  } else {
+    for(int i = 0; i &lt; n; ++i) {
+      if (NumericVector::is_na(x[i])) {
+        return NA_REAL;
+        }
+      y += x[i];
+      }
+}
+  return y/n;
+}</code></pre>
+<pre class="r"><code>x &lt;- c(1,2,3,4, NA, 5, 64, 123 ,NA, 123)
+mean(x)</code></pre>
+<pre><code>## [1] NA</code></pre>
+<pre class="r"><code>f1(x, na_rm = F)</code></pre>
+<pre><code>## [1] NA</code></pre>
+<pre class="r"><code>mean(x, na.rm = T)</code></pre>
+<pre><code>## [1] 40.625</code></pre>
+<pre class="r"><code>f1(x, na_rm = TRUE)</code></pre>
+<pre><code>## [1] 40.625</code></pre>
+<ol start="2" style="list-style-type: decimal">
+<li>Rewrite <code>cumsum()</code> and <code>diff()</code> so they can
+handle missing values. Note that these functions have slightly more
+complicated behaviour.</li>
+</ol>
+<p><code>cumsum()</code></p>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+NumericVector f2(NumericVector x, bool na_rm = true) {
+  int n = x.size();
+  NumericVector out(n);
+  out[0] = x[0];
+  
+  if (na_rm) {
+    for (int i = 1; i &lt; n; ++i) {
+      if (NumericVector::is_na(x[i])) {
+        out[i] = out[i - 1];
+      } else {
+        out[i] = out[i - 1] + x[i];
+        }
+      }
+    } else {
+      for(int i = 1; i &lt; n; ++i) {
+        if (NumericVector::is_na(x[i])) {
+          out[i] = NA_REAL;
+        } else {
+          out[i] = out[i - 1] + x[i];
+          }
+        }
+      }
+    return out;
+    }</code></pre>
+<pre class="r"><code>x &lt;- c(1,2,3,4, NA, 5, 11)
+cumsum(x)</code></pre>
+<pre><code>## [1]  1  3  6 10 NA NA NA</code></pre>
+<pre class="r"><code>f2(x)</code></pre>
+<pre><code>## [1]  1  3  6 10 10 15 26</code></pre>
+<pre class="r"><code>f2(x, na_rm = FALSE)</code></pre>
+<pre><code>## [1]  1  3  6 10 NA NA NA</code></pre>
+<p>Alternate<code>cumsum()</code></p>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+NumericVector alt_f2(NumericVector x, bool na_rm = true) {
+  int og_n = x.size();
+  int n = x.size();
+  int skips = 0;
+
+  if (na_rm) {
+    for (int i = 1; i &lt; og_n; ++i) { 
+      if (NumericVector::is_na(x[i])) {
+        n -= 1;
+        }
+      }
+  }
+  
+  NumericVector out(n);
+  out[0] = x[0];
+  
+  if (na_rm) {
+    for (int i = 1; i &lt; og_n; ++i) {
+      if (NumericVector::is_na(x[i])) {
+        skips += 1;
+        continue;
+      } else {
+        out[i - skips] = out[i - 1 - skips] + x[i];
+        }
+    }
+  } else {
+    for(int i = 1; i &lt; og_n; ++i) {
+      if (NumericVector::is_na(x[i])) {
+        out[i] = NA_REAL;
+      } else {
+        out[i] = out[i - 1] + x[i];
+        }
+      }
+    }
+  return out;
+  }</code></pre>
+<pre class="r"><code>x &lt;- c(1,2,3,4, NA, 5, 11)
+cumsum(x)</code></pre>
+<pre><code>## [1]  1  3  6 10 NA NA NA</code></pre>
+<pre class="r"><code>alt_f2(x, na_rm = FALSE)</code></pre>
+<pre><code>## [1]  1  3  6 10 NA NA NA</code></pre>
+<pre class="r"><code>alt_f2(x)</code></pre>
+<pre><code>## [1]  1  3  6 10 15 26</code></pre>
+<p><code>diff()</code></p>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+NumericVector diffC(NumericVector x, int y) {
+  int n = x.size() - y;
+  NumericVector out(n);
+
+  for(int i = 0; i &lt; n; ++i) {
+      out[i] = x[i + y] - x[i];
+  }
+  return out;
+}
+</code></pre>
+<pre class="r"><code>x &lt;- c(10,5,NA,5,2,6)
+diff(x,1)</code></pre>
+<pre><code>## [1] -5 NA NA -3  4</code></pre>
+<pre class="r"><code>diffC(x,1)</code></pre>
+<pre><code>## [1] -5 NA NA -3  4</code></pre>
+<pre class="r"><code>diff(x,2)</code></pre>
+<pre><code>## [1] NA  0 NA  1</code></pre>
+<pre class="r"><code>diffC(x,2)</code></pre>
+<pre><code>## [1] NA  0 NA  1</code></pre>
+<p>Already Works?</p>
+</div>
+</div>
+<div id="standard-template-library" class="section level2">
+<h2>25.5 Standard Template Library</h2>
+<div id="using-iterators" class="section level3">
+<h3>25.5.1 Using iterators</h3>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+double sum3(NumericVector x) {
+  double total = 0;
+  
+  NumericVector::iterator it;
+  for(it = x.begin(); it != x.end(); ++it) {
+    total += *it;
+  }
+  return total;
+}</code></pre>
+<pre class="cpp"><code>// [[Rcpp::plugins(cpp11)]]
+#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+double sum4(NumericVector xs) {
+  double total = 0;
+  
+  for(const auto &amp;x : xs) {
+    total += x;
+  }
+  return total;
+}</code></pre>
+<pre class="cpp"><code>#include &lt;numeric&gt;
+#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+double sum5(NumericVector x) {
+  return std::accumulate(x.begin(), x.end(), 0.0);
+}</code></pre>
+</div>
+<div id="algorithms" class="section level3">
+<h3>25.5.2 Algorithms</h3>
+<pre class="cpp"><code>#include &lt;algorithm&gt;
+#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+IntegerVector findInterval2(NumericVector x, NumericVector breaks) {
+  IntegerVector out(x.size());
+
+  NumericVector::iterator it, pos;
+  IntegerVector::iterator out_it;
+
+  for(it = x.begin(), out_it = out.begin(); it != x.end(); 
+      ++it, ++out_it) {
+    pos = std::upper_bound(breaks.begin(), breaks.end(), *it);
+    *out_it = std::distance(breaks.begin(), pos);
+  }
+
+  return out;
+}</code></pre>
+<div id="data-structures" class="section level4">
+<h4>25.5.3 Data structures</h4>
+</div>
+<div id="vectors-1" class="section level4">
+<h4>25.5.4 Vectors</h4>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+List rleC(NumericVector x) {
+  std::vector&lt;int&gt; lengths;
+  std::vector&lt;double&gt; values;
+
+  // Initialise first value
+  int i = 0;
+  double prev = x[0];
+  values.push_back(prev);
+  lengths.push_back(1);
+
+  NumericVector::iterator it;
+  for(it = x.begin() + 1; it != x.end(); ++it) {
+    if (prev == *it) {
+      lengths[i]++;
+    } else {
+      values.push_back(*it);
+      lengths.push_back(1);
+
+      i++;
+      prev = *it;
+    }
+  }
+
+  return List::create(
+    _[&quot;lengths&quot;] = lengths, 
+    _[&quot;values&quot;] = values
+  );
+}</code></pre>
+</div>
+</div>
+<div id="sets" class="section level3">
+<h3>25.5.5 Sets</h3>
+<pre class="cpp"><code>// [[Rcpp::plugins(cpp11)]]
+#include &lt;Rcpp.h&gt;
+#include &lt;unordered_set&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+LogicalVector duplicatedC(IntegerVector x) {
+  std::unordered_set&lt;int&gt; seen;
+  int n = x.size();
+  LogicalVector out(n);
+
+  for (int i = 0; i &lt; n; ++i) {
+    out[i] = !seen.insert(x[i]).second;
+  }
+
+  return out;
+}</code></pre>
+</div>
+<div id="map" class="section level3">
+<h3>25.5.6 Map</h3>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+std::map&lt;double, int&gt; tableC(NumericVector x) {
+  std::map&lt;double, int&gt; counts;
+
+  int n = x.size();
+  for (int i = 0; i &lt; n; i++) {
+    counts[x[i]]++;
+  }
+
+  return counts;
+}</code></pre>
+</div>
+<div id="exercises-2" class="section level3">
+<h3>25.5.7 Exercises</h3>
+<ol style="list-style-type: decimal">
+<li>median.default() using partial_sort.</li>
+</ol>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+#include &lt;algorithm&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+double medianC(NumericVector x) {
+  int n = x.size();
+  
+  if (n % 2 == 0) {
+    std::partial_sort (x.begin(), x.begin() + n / 2 + 1, x.end());
+    return (x[n / 2 - 1] + x[n / 2]) / 2;
+  } else {
+    std::partial_sort (x.begin(), x.begin() + (n + 1) /2, x.end());
+    return x[(n + 1) / 2 - 1];
+    }
+}
+</code></pre>
+<pre class="r"><code>x &lt;- c(3,1,5,2,4)
+y &lt;- c(1,3,5,2,4,6)
+median.default(x)</code></pre>
+<pre><code>## [1] 3</code></pre>
+<pre class="r"><code>medianC(x)</code></pre>
+<pre><code>## [1] 3</code></pre>
+<pre class="r"><code>median.default(y)</code></pre>
+<pre><code>## [1] 3.5</code></pre>
+<pre class="r"><code>medianC(y)</code></pre>
+<pre><code>## [1] 3.5</code></pre>
+<ol start="2" style="list-style-type: decimal">
+<li>%in% using unordered_set and the find() or count() methods.</li>
+</ol>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+#include &lt;algorithm&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+LogicalVector inC(CharacterVector x, CharacterVector table) {
+  std::unordered_set&lt;String&gt; seen;
+  seen.insert(table.begin(), table.end());
+  
+  int n = x.size();
+  LogicalVector out(n);
+  for (int i = 0; i &lt; n; ++i) {
+    out[i] = seen.find(x[i]) != seen.end();
+  }
+  
+  return out;
+}
+</code></pre>
+<pre class="r"><code>x &lt;- c(1,2,3)
+c(3,4) %in% x</code></pre>
+<pre><code>## [1]  TRUE FALSE</code></pre>
+<pre class="r"><code>inC(c(3,4), x)</code></pre>
+<pre><code>## [1]  TRUE FALSE</code></pre>
+<ol start="3" style="list-style-type: decimal">
+<li>unique() using an unordered_set (challenge: do it in one
+line!).</li>
+</ol>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+#include &lt;unordered_set&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+std::unordered_set&lt;double&gt; uniqueC(NumericVector x) {
+  return std::unordered_set&lt;double&gt;(x.begin(), x.end());
+}</code></pre>
+<pre class="r"><code>x &lt;- c(1,1,34,12,534,123,34)
+unique(x)</code></pre>
+<pre><code>## [1]   1  34  12 534 123</code></pre>
+<pre class="r"><code>uniqueC(x)</code></pre>
+<pre><code>## [1] 123  12 534  34   1</code></pre>
+<ol start="4" style="list-style-type: decimal">
+<li>min() using std::min(), or max() using std::max().</li>
+</ol>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+#include &lt;algorithm&gt;
+using namespace Rcpp;
+// [[Rcpp::export]]
+double maxC(NumericVector x) {
+  double out = x[0];
+  
+  NumericVector::iterator it;
+  for(it = x.begin(); it != x.end(); it++){
+    out = std::max(out, *it);
+    }
+  return out;
+}</code></pre>
+<pre class="r"><code>x &lt;- c(1,1,34,12,534,123,34)
+max(x)</code></pre>
+<pre><code>## [1] 534</code></pre>
+<pre class="r"><code>maxC(x)</code></pre>
+<pre><code>## [1] 534</code></pre>
+<ol start="5" style="list-style-type: decimal">
+<li>which.min() using min_element, or which.max() using
+max_element.</li>
+</ol>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+#include &lt;algorithm&gt;
+using namespace Rcpp;
+// [[Rcpp::export]]
+double which_maxC(NumericVector x) {
+  int out = std::distance(x.begin(),
+                          std::max_element(x.begin(),
+                                           x.end())) + 1;
+  return out;
+}</code></pre>
+<pre class="r"><code>x &lt;- c(1,1,34,12,534,123,34)
+which.max(x)</code></pre>
+<pre><code>## [1] 5</code></pre>
+<pre class="r"><code>which_maxC(x)</code></pre>
+<pre><code>## [1] 5</code></pre>
+<ol start="6" style="list-style-type: decimal">
+<li>setdiff(), union(), and intersect() for integers using sorted ranges
+and set_union, set_intersection and set_difference.</li>
+</ol>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+#include &lt;algorithm&gt;
+using namespace Rcpp;
+// [[Rcpp::export]]
+IntegerVector setdiffC(IntegerVector x, IntegerVector y){
+  IntegerVector sorted_x = clone(x);
+  IntegerVector sorted_y = clone(y);
+  IntegerVector out(x.size());
+  IntegerVector::iterator it;
+  
+  std::sort(sorted_x.begin(), sorted_x.end());
+  std::sort(sorted_y.begin(), sorted_y.end());
+  
+  std::set_difference(sorted_x.begin(), sorted_x.end(),
+                           sorted_y.begin(), sorted_y.end(),
+                           out.begin());
+  
+  return out;
+}</code></pre>
+<pre class="r"><code>x &lt;- c(1,2,3,4)
+y &lt;- c(3,4,5,6)
+setdiff(x,y)</code></pre>
+<pre><code>## [1] 1 2</code></pre>
+<pre class="r"><code>setdiffC(x,y)</code></pre>
+<pre><code>## [1] 1 2 0 0</code></pre>
+</div>
+</div>
+<div id="case-studies" class="section level2">
+<h2>25.6 Case studies</h2>
+<div id="gibbs-sampler" class="section level3">
+<h3>25.6.1 Gibbs sampler</h3>
+<pre class="r"><code>gibbs_r &lt;- function(N, thin) {
+  mat &lt;- matrix(nrow = N, ncol = 2)
+  x &lt;- y &lt;- 0
+
+  for (i in 1:N) {
+    for (j in 1:thin) {
+      x &lt;- rgamma(1, 3, y * y + 4)
+      y &lt;- rnorm(1, 1 / (x + 1), 1 / sqrt(2 * (x + 1)))
+    }
+    mat[i, ] &lt;- c(x, y)
+  }
+  mat
+}</code></pre>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+NumericMatrix gibbs_cpp(int N, int thin) {
+  NumericMatrix mat(N, 2);
+  double x = 0, y = 0;
+
+  for(int i = 0; i &lt; N; i++) {
+    for(int j = 0; j &lt; thin; j++) {
+      x = rgamma(1, 3, 1 / (y * y + 4))[0];
+      y = rnorm(1, 1 / (x + 1), 1 / sqrt(2 * (x + 1)))[0];
+    }
+    mat(i, 0) = x;
+    mat(i, 1) = y;
+  }
+
+  return(mat);
+}</code></pre>
+<pre class="r"><code>bench::mark(
+  gibbs_r(100, 10),
+  gibbs_cpp(100, 10),
+  check = FALSE
+)</code></pre>
+<pre><code>## # A tibble: 2 × 6
+##   expression              min   median `itr/sec` mem_alloc `gc/sec`
+##   &lt;bch:expr&gt;         &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt; &lt;bch:byt&gt;    &lt;dbl&gt;
+## 1 gibbs_r(100, 10)     3.35ms   5.25ms      180.    4.97MB     36.5
+## 2 gibbs_cpp(100, 10)    232µs  351.7µs     2409.     4.1KB     19.6</code></pre>
+</div>
+<div id="r-vectorisation-versus-c-vectorisation" class="section level3">
+<h3>25.6.2 R vectorisation versus C++ vectorisation</h3>
+<pre class="r"><code>vacc1a &lt;- function(age, female, ily) {
+  p &lt;- 0.25 + 0.3 * 1 / (1 - exp(0.04 * age)) + 0.1 * ily
+  p &lt;- p * if (female) 1.25 else 0.75
+  p &lt;- max(0, p)
+  p &lt;- min(1, p)
+  p
+}</code></pre>
+<pre class="r"><code>vacc1 &lt;- function(age, female, ily) {
+  n &lt;- length(age)
+  out &lt;- numeric(n)
+  for (i in seq_len(n)) {
+    out[i] &lt;- vacc1a(age[i], female[i], ily[i])
+  }
+  out
+}</code></pre>
+<pre class="r"><code>vacc2 &lt;- function(age, female, ily) {
+  p &lt;- 0.25 + 0.3 * 1 / (1 - exp(0.04 * age)) + 0.1 * ily
+  p &lt;- p * ifelse(female, 1.25, 0.75)
+  p &lt;- pmax(0, p)
+  p &lt;- pmin(1, p)
+  p
+}</code></pre>
+<pre class="r"><code>vacc2a &lt;- function(age, female, ily) {
+  p &lt;- 0.25 + 0.3 * 1 / (1 - exp(0.04 * age)) + 0.1 * ily
+  p &lt;- p * 0.75 + p * 0.5 * female
+  p[p &lt; 0] &lt;- 0
+  p[p &gt; 1] &lt;- 1
+  p
+}</code></pre>
+<pre class="cpp"><code>#include &lt;Rcpp.h&gt;
+using namespace Rcpp;
+
+double vacc3a(double age, bool female, bool ily){
+  double p = 0.25 + 0.3 * 1 / (1 - exp(0.04 * age)) + 0.1 * ily;
+  p = p * (female ? 1.25 : 0.75);
+  p = std::max(p, 0.0);
+  p = std::min(p, 1.0);
+  return p;
+}
+
+// [[Rcpp::export]]
+NumericVector vacc3(NumericVector age, LogicalVector female, 
+                    LogicalVector ily) {
+  int n = age.size();
+  NumericVector out(n);
+
+  for(int i = 0; i &lt; n; ++i) {
+    out[i] = vacc3a(age[i], female[i], ily[i]);
+  }
+
+  return out;
+}</code></pre>
+<pre class="r"><code>n &lt;- 1000
+age &lt;- rnorm(n, mean = 50, sd = 10)
+female &lt;- sample(c(T, F), n, rep = TRUE)
+ily &lt;- sample(c(T, F), n, prob = c(0.8, 0.2), rep = TRUE)
+
+stopifnot(
+  all.equal(vacc1(age, female, ily), vacc2(age, female, ily)),
+  all.equal(vacc2(age, female, ily), vacc2a(age, female, ily)),
+  all.equal(vacc1(age, female, ily), vacc3(age, female, ily))
+)</code></pre>
+<pre class="r"><code>bench::mark(
+  vacc1 = vacc1(age, female, ily),
+  vacc2 = vacc2(age, female, ily),
+  vacc2a = vacc2a(age, female, ily),
+  vacc3 = vacc3(age, female, ily)
+)</code></pre>
+<pre><code>## # A tibble: 4 × 6
+##   expression      min   median `itr/sec` mem_alloc `gc/sec`
+##   &lt;bch:expr&gt; &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt; &lt;bch:byt&gt;    &lt;dbl&gt;
+## 1 vacc1        1.55ms   1.95ms      464.    7.86KB    30.2 
+## 2 vacc2          69µs   89.3µs     8596.   82.76KB    12.2 
+## 3 vacc2a       48.2µs   61.9µs    12981.  131.19KB    15.3 
+## 4 vacc3        41.7µs   54.8µs    15342.   14.48KB     2.02</code></pre>
+</div>
+</div>
+<div id="using-rcpp-in-a-package" class="section level2">
+<h2>25.7 Using Rcpp in a package</h2>
+</div>
+<div id="learning-more" class="section level2">
+<h2>25.8 Learning more</h2>
+</div>
+<div id="acknowledgments" class="section level2">
+<h2>25.9 Acknowledgments</h2>
 </div>
 </div>
 
